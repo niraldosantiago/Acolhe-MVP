@@ -1,0 +1,22 @@
+{
+  "arquivo": "data/analytics/dataset_tratado.csv",
+  "observacoes": 0,
+  "colunas": [
+    "id",
+    "data_criacao",
+    "tipo_denuncia",
+    "tipo_violencia",
+    "status",
+    "arquivada",
+    "quantidade_anexos",
+    "bytes_anexos"
+  ],
+  "origem": "SQLite data/acolhe.db / tabela denuncias",
+  "tratamento": [
+    "remoção de descrição, nome, telefone e e-mail para desidentificação",
+    "normalização de tipo_denuncia para anonima/identificada",
+    "conversão de excluida_em para indicador arquivada",
+    "derivação de quantidade_anexos e bytes_anexos a partir dos metadados"
+  ],
+  "gerado_em_utc": "2026-10-04T00:29:27.597107+00:00"
+}
