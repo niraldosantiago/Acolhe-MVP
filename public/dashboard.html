@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard de Denúncias - Acolhe</title>
+  <!-- Chart.js via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
       --primary: #e63946;
@@ -42,6 +44,8 @@
     .login-box input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid var(--border); border-radius: 4px; }
     .login-box button { width: 100%; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
     .hidden { display: none !important; }
+
+    
   </style>
 </head>
 <body>
@@ -85,6 +89,22 @@
       <div class="number" id="concluidas-count">0</div>
     </div>
   </div>
+
+
+  <!-- Seção de Gráficos -->
+<div class="charts-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 25px;">
+  <!-- Gráfico de Pizza (Tipos de Violência) -->
+  <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+    <h3 style="margin-bottom: 15px; font-size: 16px; color: #2b2d42;">Tipos de Violência</h3>
+    <canvas id="chartViolencia"></canvas>
+  </div>
+
+  <!-- Gráfico de Barra (Status das Denúncias) -->
+  <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+    <h3 style="margin-bottom: 15px; font-size: 16px; color: #2b2d42;">Denúncias por Status</h3>
+    <canvas id="chartStatus"></canvas>
+  </div>
+</div>
 
   <!-- Tabela de Registos -->
   <div class="table-container">
@@ -159,17 +179,21 @@
 
     // Carregar Denúncias da API
     async function loadDashboard() {
-      try {
-        const res = await fetch(API_URL);
-        if (!res.ok) throw new Error('Não foi possível carregar os dados.');
-        const denuncias = await res.json();
+  try {
+    const res = await fetch(API_URL);
+    if (!res.ok) throw new Error('Não foi possível carregar os dados.');
+    const denuncias = await res.json();
 
-        renderMetrics(denuncias);
-        renderTable(denuncias);
-      } catch (err) {
-        alert(err.message);
-      }
-    }
+    renderMetrics(denuncias);
+    renderTable(denuncias);
+    
+    // Carrega também os gráficos dinâmicos da rota de analytics
+    loadAnalyticsCharts();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+    
 
     // Renderizar Métricas
     function renderMetrics(data) {
@@ -239,6 +263,73 @@
     });
 
     checkAuth();
+
+    let chartViolenciaInstance = null;
+let chartStatusInstance = null;
+
+// Função para renderizar os gráficos usando os dados da API
+async function loadAnalyticsCharts() {
+  try {
+    const res = await fetch('/api/admin/analytics');
+    if (!res.ok) return;
+    const data = await res.json();
+
+    // 1. Gráfico de Pizza (Tipos de Violência)
+    const violenciaData = data.distribuicoes.violencia; // [{ chave: 'fisica', valor: 5 }, ...]
+    const ctxViolencia = document.getElementById('chartViolencia').getContext('2d');
+    
+    if (chartViolenciaInstance) chartViolenciaInstance.destroy(); // Destrói instância anterior ao recarregar
+    
+    chartViolenciaInstance = new Chart(ctxViolencia, {
+      type: 'pie',
+      data: {
+        labels: violenciaData.map(item => item.chave.charAt(0).toUpperCase() + item.chave.slice(1)),
+        datasets: [{
+          data: violenciaData.map(item => item.valor),
+          backgroundColor: ['#e63946', '#457b9d', '#f4a261', '#2a9d8f', '#e76f51']
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'bottom' }
+        }
+      }
+    });
+
+    // 2. Gráfico de Barra (Status das Denúncias)
+    const statusData = data.distribuicoes.status; // [{ chave: 'Recebida', valor: 10 }, ...]
+    const ctxStatus = document.getElementById('chartStatus').getContext('2d');
+    
+    if (chartStatusInstance) chartStatusInstance.destroy();
+
+    chartStatusInstance = new Chart(ctxStatus, {
+      type: 'bar',
+      data: {
+        labels: statusData.map(item => item.chave),
+        datasets: [{
+          label: 'Quantidade',
+          data: statusData.map(item => item.valor),
+          backgroundColor: ['#ffe3e3', '#fff3bf', '#d3f9d8'],
+          borderColor: ['#c92a2a', '#e67700', '#2b8a3e'],
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          y: { beginAtZero: true, ticks: { precision: 0 } }
+        }
+      }
+    });
+
+  } catch (err) {
+    console.error('Erro ao carregar gráficos de analytics:', err);
+  }
+}
   </script>
 </body>
 </html>
