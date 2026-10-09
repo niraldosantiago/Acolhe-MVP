@@ -7,8 +7,12 @@ const { DatabaseSync } = require('node:sqlite');
 
 // Diretórios e Configurações Principais
 const ROOT = __dirname;
+// Em produção (Render), armazena em /tmp para evitar problemas de gravação no disco efémero
+const DATA = process.env.NODE_ENV === 'production'
+  ? path.join('/tmp', 'data')
+  : path.join(ROOT, 'data');
+
 const PUBLIC = path.join(ROOT, 'public');
-const DATA = path.join(ROOT, 'data');
 const UPLOADS = path.join(DATA, 'uploads');
 const PORT = Number(process.env.PORT || 3000);
 const MAX_BODY = 12 * 1024 * 1024; // 12 MB
@@ -500,21 +504,4 @@ function serve(req, res, p) {
     if (req.method === 'HEAD') return res.end();
     fs.createReadStream(file).pipe(res);
   });
-}
-
-// Inicialização do Servidor
-const server = http.createServer((req, res) =>
-  route(req, res).catch((e) => json(res, e.status || 500, { erro: e.status ? e.message : 'Erro interno do servidor.' }))
-);
-
-server.listen(PORT, '0.0.0.0', () => console.log(`Acolhe rodando em http://localhost:${PORT}`));
-
-function shutdown() {
-  server.close(() => {
-    db.close();
-    process.exit(0);
-  });
-}
-
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+  
