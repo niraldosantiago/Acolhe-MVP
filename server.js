@@ -3,15 +3,15 @@ const fs = require('node:fs');
 const fsp = fs.promises;
 const path = require('node:path');
 const crypto = require('node:crypto');
+const util = require('node:util');
 const { DatabaseSync } = require('node:sqlite');
 
-// Diretórios e Configurações Principais
-const ROOT = __dirname;
-// Em produção (Render), armazena em /tmp para evitar problemas de gravação no disco efémero
-const DATA = process.env.NODE_ENV === 'production'
-  ? path.join('/tmp', 'data')
-  : path.join(ROOT, 'data');
+const scrypt = util.promisify(crypto.scrypt);
 
+// Configuração de Diretórios e Ambiente
+const IS_PROD = process.env.NODE_ENV === 'production';
+const ROOT = __dirname;
+const DATA = IS_PROD ? path.join('/tmp', 'data') : path.join(ROOT, 'data');
 const PUBLIC = path.join(ROOT, 'public');
 const UPLOADS = path.join(DATA, 'uploads');
 const PORT = Number(process.env.PORT || 3000);
@@ -19,11 +19,11 @@ const MAX_BODY = 12 * 1024 * 1024; // 12 MB
 const ADMIN_EMAIL = String(process.env.ACOLHE_ADMIN_EMAIL || 'admin@acolhe.local').toLowerCase();
 const ADMIN_PASSWORD = process.env.ACOLHE_ADMIN_PASSWORD || 'TroqueEstaSenha!123';
 
-// Garante que a pasta de dados e a pasta de uploads existem no servidor
+// Criação de pastas necessárias
 fs.mkdirSync(DATA, { recursive: true });
 fs.mkdirSync(UPLOADS, { recursive: true, mode: 0o700 });
 
-// Conexão e Inicialização do Banco de Dados SQLite
+// Inicialização do Banco de Dados SQLite
 const db = new DatabaseSync(path.join(DATA, 'acolhe.db'));
 
 try {
@@ -69,8 +69,10 @@ db.exec(`
   );
 `);
 
-// Função utilitária para garantir compatibilidade de colunas em bancos existentes
 function ensureColumn(table, column, definition) {
+  const allowedTables = ['users', 'denuncias', 'auditoria'];
+  if (!allowedTables.includes(table)) throw new Error('Tabela não permitida.');
+  
   const cols = db.prepare(`PRAGMA table_info(${table})`).all();
   if (!cols.some((c) => c.name === column)) {
     db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
@@ -85,16 +87,18 @@ ensureColumn('denuncias', 'email', 'TEXT');
 ensureColumn('denuncias', 'arquivos', "TEXT NOT NULL DEFAULT '[]'");
 ensureColumn('denuncias', 'excluida_em', 'TEXT');
 
-// Segurança e Criptografia de Senhas
-function hashPassword(password) {
+// Hashing e Validação Assíncrona de Senhas
+async function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString('hex');
-  return `${salt}:${crypto.scryptSync(password, salt, 64).toString('hex')}`;
+  const derivedKey = await scrypt(password, salt, 64);
+  return `${salt}:${derivedKey.toString('hex')}`;
 }
 
-function checkPassword(password, stored) {
+async function checkPassword(password, stored) {
   try {
     const [salt, hex] = String(stored).split(':');
-    const actual = crypto.scryptSync(password, salt, 64);
+    if (!salt || !hex) return false;
+    const actual = await scrypt(password, salt, 64);
     const expected = Buffer.from(hex, 'hex');
     return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
   } catch {
@@ -102,7 +106,7 @@ function checkPassword(password, stored) {
   }
 }
 
-// Prepared Statements (Consultas Pré-compiladas)
+// Consultas Pré-compiladas
 const userByEmail = db.prepare('SELECT id,email,password_hash,is_admin FROM users WHERE email=?');
 const userById = db.prepare('SELECT id,email,is_admin FROM users WHERE id=?');
 const insertUser = db.prepare('INSERT INTO users(email,password_hash,is_admin) VALUES(?,?,?)');
@@ -112,14 +116,17 @@ const userReports = db.prepare('SELECT id,tipo_denuncia,tipo_violencia,status,cr
 const auditInsert = db.prepare('INSERT INTO auditoria(actor_user_id,denuncia_id,acao,detalhes) VALUES(?,?,?,?)');
 
 // Garantir Administrador Inicial
-if (!userByEmail.get(ADMIN_EMAIL)) {
-  insertUser.run(ADMIN_EMAIL, hashPassword(ADMIN_PASSWORD), 1);
-  console.warn(`Administrador inicial criado: ${ADMIN_EMAIL}.`);
-} else {
-  db.prepare('UPDATE users SET is_admin=1 WHERE email=?').run(ADMIN_EMAIL);
-}
+(async () => {
+  if (!userByEmail.get(ADMIN_EMAIL)) {
+    const hash = await hashPassword(ADMIN_PASSWORD);
+    insertUser.run(ADMIN_EMAIL, hash, 1);
+    console.warn(`Administrador inicial criado: ${ADMIN_EMAIL}`);
+  } else {
+    db.prepare('UPDATE users SET is_admin=1 WHERE email=?').run(ADMIN_EMAIL);
+  }
+})();
 
-// Gerenciamento de Sessões e Cookies
+// Sessões e Cookies
 const sessions = new Map();
 
 function getCookie(req) {
@@ -138,7 +145,8 @@ function sessionUser(req) {
 function setSession(res, id) {
   const sid = crypto.randomBytes(32).toString('hex');
   sessions.set(sid, id);
-  res.setHeader('Set-Cookie', `sid=${sid}; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400`);
+  const secureFlag = IS_PROD ? 'Secure; ' : '';
+  res.setHeader('Set-Cookie', `sid=${sid}; HttpOnly; ${secureFlag}SameSite=Strict; Path=/; Max-Age=86400`);
 }
 
 function clearSession(req, res) {
@@ -147,7 +155,29 @@ function clearSession(req, res) {
   res.setHeader('Set-Cookie', 'sid=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
 }
 
-// Utilitários de Resposta
+// Rate Limiter Simples em Memória
+const rateLimitMap = new Map();
+function rateLimit(req, res, maxRequests = 10, windowMs = 60000) {
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  const record = rateLimitMap.get(ip) || { count: 0, reset: now + windowMs };
+
+  if (now > record.reset) {
+    record.count = 0;
+    record.reset = now + windowMs;
+  }
+
+  record.count += 1;
+  rateLimitMap.set(ip, record);
+
+  if (record.count > maxRequests) {
+    json(res, 429, { erro: 'Muitas requisições. Tente novamente mais tarde.' });
+    return false;
+  }
+  return true;
+}
+
+// Respostas JSON e Leitura do Body
 function json(res, status, data, extra = {}) {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
@@ -192,7 +222,7 @@ function readBody(req) {
         reject(Object.assign(new Error('JSON inválido.'), { status: 400 }));
       }
     });
-    req.on('error', reject);
+    req.on('error', fail);
   });
 }
 
@@ -204,7 +234,7 @@ function audit(actor, id, action, details = {}) {
   auditInsert.run(actor || null, id || null, action, JSON.stringify(details));
 }
 
-// Validação e Armazenamento de Anexos
+// Anexos
 const allowedTypes = new Set(['image/jpeg', 'image/png', 'application/pdf', 'audio/mpeg', 'audio/wav']);
 
 function safeName(n) {
@@ -236,9 +266,9 @@ async function saveFiles(files, id) {
   return result;
 }
 
-// Roteador de Requisições (API e Arquivos Estáticos)
+// Roteador de Requisições
 async function route(req, res) {
-  const url = new URL(req.url, 'http://localhost');
+  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const p = url.pathname;
   const m = req.method;
   const actor = sessionUser(req);
@@ -247,21 +277,24 @@ async function route(req, res) {
   if (p === '/api/me' && m === 'GET') return json(res, 200, { user: actor || null });
 
   if (p === '/api/register' && m === 'POST') {
+    if (!rateLimit(req, res, 5)) return;
     const b = await readBody(req);
     const email = String(b.email || '').toLowerCase().trim();
     if (!validEmail(email) || typeof b.password !== 'string' || b.password.length < 6) {
       return json(res, 400, { erro: 'Informe e-mail válido e senha com pelo menos 6 caracteres.' });
     }
     if (userByEmail.get(email)) return json(res, 409, { erro: 'E-mail já cadastrado.' });
-    const r = insertUser.run(email, hashPassword(b.password), 0);
+    const hash = await hashPassword(b.password);
+    const r = insertUser.run(email, hash, 0);
     setSession(res, Number(r.lastInsertRowid));
     return json(res, 201, { mensagem: 'Conta criada.' });
   }
 
   if (p === '/api/login' && m === 'POST') {
+    if (!rateLimit(req, res, 5)) return;
     const b = await readBody(req);
     const u = userByEmail.get(String(b.email || '').toLowerCase().trim());
-    if (!u || typeof b.password !== 'string' || !checkPassword(b.password, u.password_hash)) {
+    if (!u || typeof b.password !== 'string' || !(await checkPassword(b.password, u.password_hash))) {
       return json(res, 401, { erro: 'Credenciais inválidas.' });
     }
     setSession(res, u.id);
@@ -279,6 +312,7 @@ async function route(req, res) {
   }
 
   if (p === '/api/denuncias' && m === 'POST') {
+    if (!rateLimit(req, res, 10)) return;
     const b = await readBody(req);
     const type = b.tipo_denuncia;
     const v = String(b.tipo_violencia || '');
@@ -319,9 +353,10 @@ async function route(req, res) {
   }
 
   if (p === '/api/admin/login' && m === 'POST') {
+    if (!rateLimit(req, res, 5)) return;
     const b = await readBody(req);
     const u = userByEmail.get(String(b.email || '').toLowerCase().trim());
-    if (!u?.is_admin || typeof b.password !== 'string' || !checkPassword(b.password, u.password_hash)) {
+    if (!u?.is_admin || typeof b.password !== 'string' || !(await checkPassword(b.password, u.password_hash))) {
       return json(res, 401, { erro: 'Credenciais administrativas inválidas.' });
     }
     setSession(res, u.id);
@@ -466,7 +501,7 @@ async function route(req, res) {
   return serve(req, res, p);
 }
 
-// Servidor de Arquivos Estáticos (HTML, CSS, JS)
+// Arquivos Estáticos
 function mime(file) {
   return (
     {
@@ -504,4 +539,18 @@ function serve(req, res, p) {
     if (req.method === 'HEAD') return res.end();
     fs.createReadStream(file).pipe(res);
   });
-  
+}
+
+// Servidor HTTP
+const server = http.createServer((req, res) => {
+  route(req, res).catch((err) => {
+    console.error('Erro de Execução:', err);
+    if (!res.headersSent) {
+      json(res, err.status || 500, { erro: err.message || 'Erro interno no servidor.' });
+    }
+  });
+});
+
+server.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT} [Ambiente: ${IS_PROD ? 'Produção' : 'Desenvolvimento'}]`);
+});
