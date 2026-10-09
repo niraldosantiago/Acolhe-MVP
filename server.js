@@ -318,6 +318,11 @@ async function route(req, res) {
     const v = String(b.tipo_violencia || '');
     const d = String(b.descricao || '').trim();
 
+    // 🔒 NOVA REGRA: Denúncias identificadas exigem usuário logado
+    if (type === 'identified' && !actor) {
+      return json(res, 401, { erro: 'Faça login para enviar uma denúncia identificada.' });
+    }
+
     if (
       !['anon', 'identified'].includes(type) ||
       !['fisica', 'psicologica', 'patrimonial', 'sexual', 'moral'].includes(v) ||
@@ -327,6 +332,7 @@ async function route(req, res) {
       return json(res, 400, { erro: 'Dados da denúncia inválidos.' });
     }
 
+    
     const total = (Array.isArray(b.arquivos) ? b.arquivos : []).reduce((n, x) => n + (Number(x?.size) || 0), 0);
     if (total > 10 * 1024 * 1024) return json(res, 400, { erro: 'O total de anexos excede 10 MB.' });
 
