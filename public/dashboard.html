@@ -4,8 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard de Denúncias - Acolhe</title>
-  <!-- Chart.js via CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
       --primary: #e63946;
@@ -28,6 +26,17 @@
     .metric-card h3 { font-size: 14px; color: #6c757d; margin-bottom: 10px; }
     .metric-card .number { font-size: 32px; font-weight: bold; color: var(--primary); }
 
+    /* Seção de Barras de Progresso */
+    .progress-section { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 25px; }
+    .progress-card { background: var(--card-bg); padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .progress-card h3 { margin-bottom: 15px; font-size: 16px; color: var(--text); }
+    
+    .progress-item { margin-bottom: 15px; }
+    .progress-item:last-child { margin-bottom: 0; }
+    .progress-header { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+    .progress-track { width: 100%; height: 10px; background-color: #e9ecef; border-radius: 5px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 5px; transition: width 0.4s ease; }
+
     /* Tabela de Denúncias */
     .table-container { background: var(--card-bg); padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; margin-top: 15px; }
@@ -44,8 +53,6 @@
     .login-box input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid var(--border); border-radius: 4px; }
     .login-box button { width: 100%; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
     .hidden { display: none !important; }
-
-    
   </style>
 </head>
 <body>
@@ -90,21 +97,24 @@
     </div>
   </div>
 
+  <!-- Seção de Barras de Progresso -->
+  <div class="progress-section">
+    <!-- Barras por Tipos de Violência -->
+    <div class="progress-card">
+      <h3>Tipos de Violência</h3>
+      <div id="progress-violencia-container">
+        <p style="font-size: 13px; color: #888;">A carregar dados...</p>
+      </div>
+    </div>
 
-  <!-- Seção de Gráficos -->
-<div class="charts-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 25px;">
-  <!-- Gráfico de Pizza (Tipos de Violência) -->
-  <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-    <h3 style="margin-bottom: 15px; font-size: 16px; color: #2b2d42;">Tipos de Violência</h3>
-    <canvas id="chartViolencia"></canvas>
+    <!-- Barras por Status -->
+    <div class="progress-card">
+      <h3>Denúncias por Status</h3>
+      <div id="progress-status-container">
+        <p style="font-size: 13px; color: #888;">A carregar dados...</p>
+      </div>
+    </div>
   </div>
-
-  <!-- Gráfico de Barra (Status das Denúncias) -->
-  <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-    <h3 style="margin-bottom: 15px; font-size: 16px; color: #2b2d42;">Denúncias por Status</h3>
-    <canvas id="chartStatus"></canvas>
-  </div>
-</div>
 
   <!-- Tabela de Registos -->
   <div class="table-container">
@@ -179,21 +189,20 @@
 
     // Carregar Denúncias da API
     async function loadDashboard() {
-  try {
-    const res = await fetch(API_URL);
-    if (!res.ok) throw new Error('Não foi possível carregar os dados.');
-    const denuncias = await res.json();
+      try {
+        const res = await fetch(API_URL);
+        if (!res.ok) throw new Error('Não foi possível carregar os dados.');
+        const denuncias = await res.json();
 
-    renderMetrics(denuncias);
-    renderTable(denuncias);
-    
-    // Carrega também os gráficos dinâmicos da rota de analytics
-    loadAnalyticsCharts();
-  } catch (err) {
-    alert(err.message);
-  }
-}
-    
+        renderMetrics(denuncias);
+        renderTable(denuncias);
+        
+        // Carrega as barras de progresso a partir dos dados de analytics
+        loadAnalyticsProgress();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
 
     // Renderizar Métricas
     function renderMetrics(data) {
@@ -264,72 +273,72 @@
 
     checkAuth();
 
-    let chartViolenciaInstance = null;
-let chartStatusInstance = null;
+    // Renderiza as Barras de Progresso
+    async function loadAnalyticsProgress() {
+      try {
+        const res = await fetch('/api/admin/analytics');
+        if (!res.ok) return;
+        const data = await res.json();
 
-// Função para renderizar os gráficos usando os dados da API
-async function loadAnalyticsCharts() {
-  try {
-    const res = await fetch('/api/admin/analytics');
-    if (!res.ok) return;
-    const data = await res.json();
+        // 1. Barras de Tipos de Violência
+        const violenciaData = data.distribuicoes.violencia; // ex: [{ chave: 'fisica', valor: 5 }, ...]
+        const totalViolencia = violenciaData.reduce((acc, item) => acc + item.valor, 0);
+        const violenciaContainer = document.getElementById('progress-violencia-container');
+        violenciaContainer.innerHTML = '';
 
-    // 1. Gráfico de Pizza (Tipos de Violência)
-    const violenciaData = data.distribuicoes.violencia; // [{ chave: 'fisica', valor: 5 }, ...]
-    const ctxViolencia = document.getElementById('chartViolencia').getContext('2d');
-    
-    if (chartViolenciaInstance) chartViolenciaInstance.destroy(); // Destrói instância anterior ao recarregar
-    
-    chartViolenciaInstance = new Chart(ctxViolencia, {
-      type: 'pie',
-      data: {
-        labels: violenciaData.map(item => item.chave.charAt(0).toUpperCase() + item.chave.slice(1)),
-        datasets: [{
-          data: violenciaData.map(item => item.valor),
-          backgroundColor: ['#e63946', '#457b9d', '#f4a261', '#2a9d8f', '#e76f51']
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { position: 'bottom' }
-        }
+        const violenciaColors = ['#e63946', '#457b9d', '#f4a261', '#2a9d8f', '#e76f51'];
+
+        violenciaData.forEach((item, index) => {
+          const pct = totalViolencia > 0 ? Math.round((item.valor / totalViolencia) * 100) : 0;
+          const label = item.chave.charAt(0).toUpperCase() + item.chave.slice(1);
+          const color = violenciaColors[index % violenciaColors.length];
+
+          violenciaContainer.innerHTML += `
+            <div class="progress-item">
+              <div class="progress-header">
+                <span>${label}</span>
+                <span>${item.valor} (${pct}%)</span>
+              </div>
+              <div class="progress-track">
+                <div class="progress-fill" style="width: ${pct}%; background-color: ${color};"></div>
+              </div>
+            </div>
+          `;
+        });
+
+        // 2. Barras de Status das Denúncias
+        const statusData = data.distribuicoes.status; // ex: [{ chave: 'Recebida', valor: 10 }, ...]
+        const totalStatus = statusData.reduce((acc, item) => acc + item.valor, 0);
+        const statusContainer = document.getElementById('progress-status-container');
+        statusContainer.innerHTML = '';
+
+        const statusColorMap = {
+          'Recebida': '#c92a2a',
+          'Em análise': '#e67700',
+          'Concluída': '#2b8a3e'
+        };
+
+        statusData.forEach(item => {
+          const pct = totalStatus > 0 ? Math.round((item.valor / totalStatus) * 100) : 0;
+          const color = statusColorMap[item.chave] || '#457b9d';
+
+          statusContainer.innerHTML += `
+            <div class="progress-item">
+              <div class="progress-header">
+                <span>${item.chave}</span>
+                <span>${item.valor} (${pct}%)</span>
+              </div>
+              <div class="progress-track">
+                <div class="progress-fill" style="width: ${pct}%; background-color: ${color};"></div>
+              </div>
+            </div>
+          `;
+        });
+
+      } catch (err) {
+        console.error('Erro ao carregar dados de progresso:', err);
       }
-    });
-
-    // 2. Gráfico de Barra (Status das Denúncias)
-    const statusData = data.distribuicoes.status; // [{ chave: 'Recebida', valor: 10 }, ...]
-    const ctxStatus = document.getElementById('chartStatus').getContext('2d');
-    
-    if (chartStatusInstance) chartStatusInstance.destroy();
-
-    chartStatusInstance = new Chart(ctxStatus, {
-      type: 'bar',
-      data: {
-        labels: statusData.map(item => item.chave),
-        datasets: [{
-          label: 'Quantidade',
-          data: statusData.map(item => item.valor),
-          backgroundColor: ['#ffe3e3', '#fff3bf', '#d3f9d8'],
-          borderColor: ['#c92a2a', '#e67700', '#2b8a3e'],
-          borderWidth: 1
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { display: false }
-        },
-        scales: {
-          y: { beginAtZero: true, ticks: { precision: 0 } }
-        }
-      }
-    });
-
-  } catch (err) {
-    console.error('Erro ao carregar gráficos de analytics:', err);
-  }
-}
+    }
   </script>
 </body>
 </html>
