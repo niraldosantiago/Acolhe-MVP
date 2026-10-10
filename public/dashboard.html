@@ -16,9 +16,19 @@
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     body { background-color: var(--bg); color: var(--text); padding: 20px; }
 
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; background: var(--card-bg); padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; background: var(--card-bg); padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); flex-wrap: wrap; gap: 15px; }
     .header h1 { color: var(--primary); font-size: 24px; }
-    .btn-danger { background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+    .header-actions { display: flex; gap: 10px; align-items: center; }
+    
+    .btn-danger { background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; }
+    .btn-danger:hover { background: #d90429; }
+    .btn-warning { background: #adb5bd; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; }
+    .btn-warning:hover { background: #6c757d; }
+
+    /* Barra de Ferramentas / Busca */
+    .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: var(--card-bg); padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); gap: 15px; flex-wrap: wrap; }
+    .search-box { display: flex; gap: 10px; width: 100%; max-width: 400px; }
+    .search-box input { flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px; }
 
     /* Métricas */
     .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 25px; }
@@ -71,10 +81,22 @@
     </div>
   </div>
 
-  <!-- Conteúdo do Dashboard -->
+  <!-- Cabeçalho -->
   <div class="header">
     <h1>Dashboard de Denúncias</h1>
-    <button class="btn-danger" id="btn-logout">Sair</button>
+    <div class="header-actions">
+      <button class="btn-warning" id="btn-limpar-base">Limpar Banco de Dados</button>
+      <button class="btn-danger" id="btn-logout">Sair</button>
+    </div>
+  </div>
+
+  <!-- Barra de Ferramentas / Busca -->
+  <div class="toolbar">
+    <div class="search-box">
+      <input type="text" id="search-input" placeholder="Pesquisar por ID, descrição ou e-mail..." />
+      <button class="btn-danger" id="btn-search" style="padding: 8px 12px;">Pesquisar</button>
+    </div>
+    <div style="font-size: 13px; color: #6c757d;" id="result-count">A carregar registos...</div>
   </div>
 
   <!-- Cards de Métricas -->
@@ -99,7 +121,6 @@
 
   <!-- Seção de Barras de Progresso -->
   <div class="progress-section">
-    <!-- Barras por Tipos de Violência -->
     <div class="progress-card">
       <h3>Tipos de Violência</h3>
       <div id="progress-violencia-container">
@@ -107,7 +128,6 @@
       </div>
     </div>
 
-    <!-- Barras por Status -->
     <div class="progress-card">
       <h3>Denúncias por Status</h3>
       <div id="progress-status-container">
@@ -141,8 +161,6 @@
   </div>
 
   <script>
-    const API_URL = '/api/admin/denuncias';
-
     // Verificar Autenticação ao carregar
     async function checkAuth() {
       try {
@@ -187,22 +205,52 @@
       }
     });
 
-    // Carregar Denúncias da API
+    // Carregar Denúncias da API com Suporte a Busca
     async function loadDashboard() {
+      const query = document.getElementById('search-input').value.trim();
+      let url = '/api/admin/denuncias';
+      if (query) {
+        url += `?q=${encodeURIComponent(query)}`;
+      }
+
       try {
-        const res = await fetch(API_URL);
+        const res = await fetch(url);
         if (!res.ok) throw new Error('Não foi possível carregar os dados.');
         const denuncias = await res.json();
 
         renderMetrics(denuncias);
         renderTable(denuncias);
-        
-        // Carrega as barras de progresso a partir dos dados de analytics
         loadAnalyticsProgress();
       } catch (err) {
-        alert(err.message);
+        console.error(err.message);
       }
     }
+
+    // Evento de busca
+    document.getElementById('btn-search').addEventListener('click', () => loadDashboard());
+    document.getElementById('search-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') loadDashboard();
+    });
+
+    // Botão para limpar/excluir dados da base
+    document.getElementById('btn-limpar-base').addEventListener('click', async () => {
+      if (!confirm('ATENÇÃO: Deseja realmente excluir todas as denúncias da base de dados? Esta ação libertará espaço na memória, mas apagará o histórico atual.')) {
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/admin/denuncias/limpar', { method: 'DELETE' });
+        const data = await res.json();
+        if (res.ok) {
+          alert('Base de dados limpa com sucesso.');
+          loadDashboard();
+        } else {
+          alert(data.erro || 'Erro ao limpar a base de dados.');
+        }
+      } catch (e) {
+        alert('Erro de conexão ao tentar limpar a base.');
+      }
+    });
 
     // Renderizar Métricas
     function renderMetrics(data) {
@@ -210,6 +258,7 @@
       document.getElementById('recebidas-count').textContent = data.filter(d => d.status === 'Recebida').length;
       document.getElementById('analise-count').textContent = data.filter(d => d.status === 'Em análise').length;
       document.getElementById('concluidas-count').textContent = data.filter(d => d.status === 'Concluída').length;
+      document.getElementById('result-count').textContent = `Mostrando ${data.length} registo(s)`;
     }
 
     // Renderizar Tabela
@@ -273,7 +322,7 @@
 
     checkAuth();
 
-    // Renderiza as Barras de Progresso
+    // Renderiza as Barras de Progresso via Analytics
     async function loadAnalyticsProgress() {
       try {
         const res = await fetch('/api/admin/analytics');
@@ -281,7 +330,7 @@
         const data = await res.json();
 
         // 1. Barras de Tipos de Violência
-        const violenciaData = data.distribuicoes.violencia; // ex: [{ chave: 'fisica', valor: 5 }, ...]
+        const violenciaData = data.distribuicoes.violencia;
         const totalViolencia = violenciaData.reduce((acc, item) => acc + item.valor, 0);
         const violenciaContainer = document.getElementById('progress-violencia-container');
         violenciaContainer.innerHTML = '';
@@ -307,7 +356,7 @@
         });
 
         // 2. Barras de Status das Denúncias
-        const statusData = data.distribuicoes.status; // ex: [{ chave: 'Recebida', valor: 10 }, ...]
+        const statusData = data.distribuicoes.status;
         const totalStatus = statusData.reduce((acc, item) => acc + item.valor, 0);
         const statusContainer = document.getElementById('progress-status-container');
         statusContainer.innerHTML = '';

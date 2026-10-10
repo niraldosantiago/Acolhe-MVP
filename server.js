@@ -403,6 +403,16 @@ async function route(req, res) {
     return json(res, 200, db.prepare(sql).all(...params));
   }
 
+  if (p === '/api/admin/denuncias/limpar' && m === 'DELETE') {
+    const admin = requireAdmin(req, res);
+    if (!admin) return;
+    db.prepare('DELETE FROM denuncias').run();
+    db.prepare('DELETE FROM auditoria').run();
+    audit(admin.id, null, 'limpar_base_dados');
+    return json(res, 200, { mensagem: 'Base de dados limpa com sucesso.' });
+  }
+
+
   const pm = p.match(/^\/api\/admin\/denuncias\/(\d+)$/);
   if (pm && m === 'PATCH') {
     const admin = requireAdmin(req, res);
