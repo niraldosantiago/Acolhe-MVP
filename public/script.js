@@ -222,7 +222,7 @@ const i18nTranslations = {
     chat_header: "Soporte Acolhe",
     chat_status: "En línea • Canal Seguro",
     chat_welcome: "¡Hola! Estás en un chat seguro y confidencial. ¿Cómo podemos ayudarte hoy?",
-    footer_desc: "Una plataforma segura y confidencial orientada a la acogida, orientación y protección de mujeres en situación de vulnerabilidad o violencia.",
+    footer_desc: "Una plataforma segura y confidencial orientada a la acogida, orientación y protección de mujeres en situación de vulnerabilidad ou violencia.",
     footer_nav_title: "Navegación",
     footer_channels_title: "Canales de Ayuda",
     contact_190: "Policía Militar",
@@ -233,7 +233,6 @@ const i18nTranslations = {
   }
 };
 
-
 function switchAuthTab(tab) {
   const loginForm = document.getElementById('login-form');
   const registerForm = document.getElementById('register-form');
@@ -241,17 +240,18 @@ function switchAuthTab(tab) {
   const regBtn = document.getElementById('tab-register-btn');
 
   if (tab === 'login') {
-    loginForm.style.display = 'block';
-    registerForm.style.display = 'none';
-    loginBtn.classList.add('active');
-    regBtn.classList.remove('active');
+    if (loginForm) loginForm.style.display = 'block';
+    if (registerForm) registerForm.style.display = 'none';
+    if (loginBtn) loginBtn.classList.add('active');
+    if (regBtn) regBtn.classList.remove('active');
   } else {
-    loginForm.style.display = 'none';
-    registerForm.style.display = 'block';
-    loginBtn.classList.remove('active');
-    regBtn.classList.add('active');
+    if (loginForm) loginForm.style.display = 'none';
+    if (registerForm) registerForm.style.display = 'block';
+    if (loginBtn) loginBtn.classList.remove('active');
+    if (regBtn) regBtn.classList.add('active');
   }
 }
+
 // --- NAVEGAÇÃO ENTRE SEÇÕES (SPA) ---
 function navigateTo(targetId) {
   document.querySelectorAll('.page-section').forEach(sec => sec.classList.remove('active'));
@@ -273,7 +273,6 @@ function navigateTo(targetId) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// Event Listeners nos botões de navegação (Desktop e Mobile)
 document.querySelectorAll('.nav-btn, .mob-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const target = btn.getAttribute('data-target');
@@ -281,12 +280,12 @@ document.querySelectorAll('.nav-btn, .mob-btn').forEach(btn => {
   });
 });
 
-// --- SISTEMA DE TRADUÇÃO (CORRIGIDO) ---
+// --- SISTEMA DE TRADUÇÃO ---
 const langSelector = document.getElementById('lang-selector');
 if (langSelector) {
   langSelector.addEventListener('change', (e) => {
     const selectedLang = e.target.value;
-    const dict = i18nTranslations[selectedLang]; // Correção da referência de objeto
+    const dict = i18nTranslations[selectedLang];
 
     if (!dict) return;
 
@@ -320,7 +319,7 @@ function updateCharCount() {
 
 function toggleRadioCard(input) {
   document.querySelectorAll('.radio-card').forEach(card => card.classList.remove('active'));
-  input.closest('.radio-card').classList.add('active');
+  input.closest('.radio-card')?.classList.add('active');
 }
 
 function toggleReportType(radio) {
@@ -341,32 +340,103 @@ function toggleReportType(radio) {
   }
 }
 
+// Gestão unificada de arquivos com suporte a pré-visualização e Base64
+let selectedFiles = [];
+
 function handleFiles(input) {
-  const fileListContainer = document.getElementById('file-list');
-  if (!fileListContainer) return;
+  const files = Array.from(input.files);
+  selectedFiles = selectedFiles.concat(files);
+  renderFileList();
+}
 
-  fileListContainer.innerHTML = '';
+function renderFileList() {
+  const container = document.getElementById('file-list-container') || document.getElementById('file-list');
+  const list = document.getElementById('file-list');
+  if (!list) return;
 
-  Array.from(input.files).forEach(file => {
+  list.innerHTML = '';
+
+  if (selectedFiles.length === 0) {
+    if (container && container !== list) container.style.display = 'none';
+    return;
+  }
+
+  if (container && container !== list) container.style.display = 'block';
+  selectedFiles.forEach((file, index) => {
     const item = document.createElement('div');
-    item.innerText = `📄 ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
-    fileListContainer.appendChild(item);
+    item.className = 'file-item';
+    item.innerHTML = `
+      <span><i class="fa-solid fa-file"></i> ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+      <button type="button" class="btn-remove-file" onclick="removeFile(${index})" title="Remover arquivo">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    `;
+    list.appendChild(item);
   });
 }
+
+function removeFile(index) {
+  selectedFiles.splice(index, 1);
+  renderFileList();
+}
+
+function clearAllFiles() {
+  selectedFiles = [];
+  const fileInput = document.getElementById('file-input');
+  if (fileInput) fileInput.value = '';
+  renderFileList();
+}
+
+function resetForm() {
+  const form = document.getElementById('report-form');
+  if (form) form.reset();
+  clearAllFiles();
+  const charCount = document.getElementById('char-count');
+  if (charCount) charCount.innerText = '0';
+  const identifiedFields = document.getElementById('identified-fields');
+  if (identifiedFields) identifiedFields.style.display = 'none';
+}
+
+// Conversão de arquivo para Base64 para envio correto ao backend
+const toBase64 = file => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.readAsDataURL(file);
+  reader.onload = () => resolve(reader.result);
+  reader.onerror = error => reject(error);
+});
 
 async function submitForm(e) {
   e.preventDefault();
 
   const form = e.target;
   const tipoDenuncia = form.querySelector('input[name="anon_type"]:checked')?.value;
-  const tipoViolencia = form.querySelector('.custom-select')?.value;
+  const tipoViolencia = form.querySelector('.custom-select')?.value || document.getElementById('tipo-violencia')?.value;
   const descricao = document.getElementById('report-text')?.value.trim();
   
   const nome = document.getElementById('user-name')?.value.trim() || null;
   const telefone = document.getElementById('user-phone')?.value.trim() || null;
+  const email = document.getElementById('user-email')?.value.trim() || null;
 
   if (!tipoDenuncia || !tipoViolencia || !descricao) {
     alert('Preencha todos os campos obrigatórios antes de enviar.');
+    return;
+  }
+
+  // Prepara os ficheiros convertendo-os em Base64
+  let arquivosPayload = [];
+  try {
+    for (const file of selectedFiles) {
+      const base64Data = await toBase64(file);
+      arquivosPayload.push({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        data: base64Data
+      });
+    }
+  } catch (err) {
+    console.error('Erro ao processar anexos:', err);
+    alert('Erro ao processar os arquivos anexados.');
     return;
   }
 
@@ -375,7 +445,9 @@ async function submitForm(e) {
     tipo_violencia: tipoViolencia,
     descricao: descricao,
     nome: tipoDenuncia === 'identified' ? nome : null,
-    telefone: tipoDenuncia === 'identified' ? telefone : null
+    telefone: tipoDenuncia === 'identified' ? telefone : null,
+    email: tipoDenuncia === 'identified' ? email : null,
+    arquivos: arquivosPayload
   };
 
   try {
@@ -384,32 +456,31 @@ async function submitForm(e) {
       headers: {
         'Content-Type': 'application/json'
       },
+      credentials: 'include',
       body: JSON.stringify(payload)
     });
 
     const dados = await resposta.json();
 
     if (!resposta.ok) {
+      if (resposta.status === 401) {
+        alert('Deve efetuar login para enviar uma denúncia identificada.');
+        return;
+      }
       throw new Error(dados.erro || 'Não foi possível cadastrar a denúncia.');
     }
 
     alert(`Denúncia cadastrada com sucesso. Protocolo: ${dados.id}`);
-
-    form.reset();
-    document.getElementById('file-list').innerHTML = '';
-    document.getElementById('char-count').innerText = '0';
-    if (document.getElementById('identified-fields')) {
-      document.getElementById('identified-fields').style.display = 'none';
-    }
+    resetForm();
   } catch (erro) {
     console.error(erro);
-    alert('Erro ao enviar a denúncia. Verifique a conexão com o servidor.');
+    alert(`Erro ao enviar a denúncia: ${erro.message}`);
   }
 }
 
-// --- MAPA INTERATIVO (LEAFLET / OPENSTREETMAP - CORRIGIDO) ---
+// --- MAPA INTERATIVO (LEAFLET) ---
 let leafletMap;
-let markersLayer = L.layerGroup(); // Grupo para gerenciamento de marcadores
+let markersLayer = L.layerGroup();
 
 const sampleLocations = [
   {
@@ -451,18 +522,16 @@ function initLeafletMap() {
 }
 
 function renderPlaces(places) {
-  markersLayer.clearLayers(); // Limpa marcadores antigos para evitar duplicação
+  markersLayer.clearLayers();
 
   const placesList = document.getElementById('places-list');
   if (placesList) placesList.innerHTML = '';
 
   places.forEach(place => {
-    // Adiciona marcador via LayerGroup
     L.marker([place.lat, place.lng])
       .bindPopup(`<b>${place.name}</b><br>${place.desc}`)
       .addTo(markersLayer);
 
-    // Renderiza Card
     if (placesList) {
       const placeCard = document.createElement('div');
       placeCard.className = 'place-item';
@@ -522,6 +591,7 @@ function sendChatMessage() {
   if (!text) return;
 
   const messagesContainer = document.getElementById('chat-messages');
+  if (!messagesContainer) return;
 
   const userMsg = document.createElement('div');
   userMsg.className = 'msg user-msg';
@@ -556,57 +626,3 @@ window.addEventListener('DOMContentLoaded', () => {
   initLeafletMap();
 });
 
-let selectedFiles = [];
-
-// Atualiza e exibe os arquivos
-function handleFiles(input) {
-  const files = Array.from(input.files);
-  selectedFiles = selectedFiles.concat(files);
-  renderFileList();
-}
-
-// Renderiza a lista de arquivos com botão de excluir
-function renderFileList() {
-  const container = document.getElementById('file-list-container');
-  const list = document.getElementById('file-list');
-  list.innerHTML = '';
-
-  if (selectedFiles.length === 0) {
-    container.style.display = 'none';
-    return;
-  }
-
-  container.style.display = 'block';
-  selectedFiles.forEach((file, index) => {
-    const item = document.createElement('div');
-    item.className = 'file-item';
-    item.innerHTML = `
-      <span><i class="fa-solid fa-file"></i> ${file.name}</span>
-      <button type="button" class="btn-remove-file" onclick="removeFile(${index})" title="Remover arquivo">
-        <i class="fa-solid fa-xmark"></i>
-      </button>
-    `;
-    list.appendChild(item);
-  });
-}
-
-// Exclui um arquivo específico
-function removeFile(index) {
-  selectedFiles.splice(index, 1);
-  renderFileList();
-}
-
-// Exclui todos os arquivos
-function clearAllFiles() {
-  selectedFiles = [];
-  document.getElementById('file-input').value = '';
-  renderFileList();
-}
-
-// Limpa todos os campos do formulário
-function resetForm() {
-  document.getElementById('report-form').reset();
-  clearAllFiles();
-  document.getElementById('char-count').innerText = '0';
-  document.getElementById('identified-fields').style.display = 'none';
-}
