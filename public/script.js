@@ -648,3 +648,22 @@ window.addEventListener('DOMContentLoaded', () => {
   initLeafletMap();
 });
 
+document.getElementById('btn-user-logout')?.addEventListener('click', async () => {
+  try {
+    const res = await fetch('/api/logout', { 
+      method: 'POST',
+      credentials: 'include' // Garante que o cookie 'sid' é limpo no servidor
+    });
+
+    if (res.ok) {
+      alert('Sessão encerrada com sucesso.');
+      // Redireciona para a página inicial ou limpa os dados da interface
+      window.location.href = '/index.html'; 
+    } else {
+      alert('Erro ao terminar sessão.');
+    }
+  } catch (e) {
+    console.error('Erro de conexão:', e);
+    alert('Erro ao ligar ao servidor.');
+  }
+});
