@@ -240,16 +240,21 @@ function audit(actor, id, action, details = {}) {
 function analisarTextoComIA(descricao, tipoViolencia) {
   const texto = String(descricao || '').toLowerCase();
   
-  const termosCriticos = ['arma', 'sangue', 'ameaça de morte', 'espancado', 'espancada', 'socos', 'faca', 'perigo iminente', 'trancada', 'trancado', 'agressão física grave'];
-  const termosModerados = ['xingou', 'humilhou', 'empurrou', 'controlador', 'ciúme', 'xingamento', 'financeiro'];
+  // Termos indicativos de pedido de informação ou baixo risco
+  const termosInformativos = ['gostaria de obter', 'informações sobre', 'quais são os meus direitos', 'onde posso procurar', 'duvida', 'orientações'];
+  const eInformativo = termosInformativos.some(termo => texto.includes(termo));
 
-  let pontos = 0;
+  const termosCriticos = ['arma', 'sangue', 'ameaça de morte', 'espancado', 'espancada', 'socos', 'faca', 'perigo iminente', 'trancada', 'trancado', 'agressão física'];
+  const termosModerados = ['xingou', 'humilhou', 'empurrou', 'controlador', 'ciúme', 'xingamento', 'financeiro', 'ameaça', 'ofensa'];
+
+  let pontos = 20;
   let urgencia = 'Baixa';
-  let recomendacoes = ['Acolhimento psicológico padrão', 'Orientações sobre direitos da vítima'];
+  let recomendacoes = ['Disponibilização de cartilhas informativas e canais de escuta'];
 
   const criticoEncontrado = termosCriticos.some(termo => texto.includes(termo));
   const moderadoEncontrado = termosModerados.some(termo => texto.includes(termo));
 
+  // 1. Casos Críticos (Prioridade Máxima)
   if (criticoEncontrado || tipoViolencia === 'fisica' || tipoViolencia === 'sexual') {
     pontos = 90;
     urgencia = 'Alta';
@@ -258,17 +263,15 @@ function analisarTextoComIA(descricao, tipoViolencia) {
       'Acionamento de suporte policial/emergencial se houver risco atual',
       'Atendimento psicológico de crise imediato'
     ];
-  } else if (moderadoEncontrado || tipoViolencia === 'psicologica' || tipoViolencia === 'moral') {
+  } 
+  // 2. Casos Moderados (Apenas se houver termos moderados OU se não for apenas um pedido informativo)
+  else if ((moderadoEncontrado || tipoViolencia === 'psicologica' || tipoViolencia === 'moral') && !eInformativo) {
     pontos = 50;
     urgencia = 'Média';
     recomendacoes = [
       'Agendamento de atendimento de apoio especializado',
       'Orientação jurídica e social'
     ];
-  } else {
-    pontos = 20;
-    urgencia = 'Baixa';
-    recomendacoes = ['Disponibilização de cartilhas informativas e canais de escuta'];
   }
 
   return {
