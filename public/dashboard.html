@@ -18,12 +18,13 @@
 
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; background: var(--card-bg); padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); flex-wrap: wrap; gap: 15px; }
     .header h1 { color: var(--primary); font-size: 24px; }
-    .header-actions { display: flex; gap: 10px; align-items: center; }
+    .header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     
     .btn-danger { background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; }
     .btn-danger:hover { background: #d90429; }
     .btn-warning { background: #adb5bd; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; }
     .btn-warning:hover { background: #6c757d; }
+    .btn-sm { padding: 4px 8px; font-size: 12px; }
 
     /* Barra de Ferramentas / Busca */
     .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: var(--card-bg); padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); gap: 15px; flex-wrap: wrap; }
@@ -85,6 +86,7 @@
   <div class="header">
     <h1>Dashboard de Denúncias</h1>
     <div class="header-actions">
+      <button class="btn-danger btn-sm" id="btn-excluir-selecionadas">Excluir Selecionadas</button>
       <button class="btn-warning" id="btn-limpar-base">Limpar Banco de Dados</button>
       <button class="btn-danger" id="btn-logout">Sair</button>
     </div>
@@ -142,6 +144,7 @@
     <table>
       <thead>
         <tr>
+          <th><input type="checkbox" id="select-all" /></th>
           <th>ID</th>
           <th>Data</th>
           <th>Tipo</th>
@@ -154,14 +157,13 @@
       </thead>
       <tbody id="denuncias-tbody">
         <tr>
-          <td colspan="8" style="text-align: center;">A carregar dados...</td>
+          <td colspan="9" style="text-align: center;">A carregar dados...</td>
         </tr>
       </tbody>
     </table>
   </div>
 
   <script>
-    // Verificar Autenticação ao carregar
     async function checkAuth() {
       try {
         const res = await fetch('/api/admin/me');
@@ -176,7 +178,6 @@
       }
     }
 
-    // Login Admin
     document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const email = document.getElementById('email').value;
@@ -205,7 +206,6 @@
       }
     });
 
-    // Carregar Denúncias da API com Suporte a Busca
     async function loadDashboard() {
       const query = document.getElementById('search-input').value.trim();
       let url = '/api/admin/denuncias';
@@ -226,17 +226,55 @@
       }
     }
 
-    // Evento de busca
     document.getElementById('btn-search').addEventListener('click', () => loadDashboard());
     document.getElementById('search-input').addEventListener('keypress', (e) => {
       if (e.key === 'Enter') loadDashboard();
     });
 
-    // Botão para limpar/excluir dados da base
-    document.getElementById('btn-limpar-base').addEventListener('click', async () => {
-      if (!confirm('ATENÇÃO: Deseja realmente excluir todas as denúncias da base de dados? Esta ação libertará espaço na memória, mas apagará o histórico atual.')) {
+    // Selecionar / Deselecionar todos
+    document.getElementById('select-all').addEventListener('change', (e) => {
+      const checkboxes = document.querySelectorAll('.row-checkbox');
+      checkboxes.forEach(cb => cb.checked = e.target.checked);
+    });
+
+    // Excluir denúncias selecionadas
+    document.getElementById('btn-excluir-selecionadas').addEventListener('click', async () => {
+      const selected = Array.from(document.querySelectorAll('.row-checkbox:checked')).map(cb => cb.value);
+      if (selected.length === 0) {
+        alert('Selecione pelo menos uma denúncia para excluir.');
         return;
       }
+
+      if (!confirm(`Deseja realmente excluir as ${selected.length} denúncia(s) selecionada(s)?`)) return;
+
+      try {
+        for (const id of selected) {
+          await fetch(`/api/admin/denuncias/${id}`, { method: 'DELETE' });
+        }
+        alert('Denúncias selecionadas excluídas com sucesso.');
+        loadDashboard();
+      } catch (e) {
+        alert('Erro ao excluir as denúncias selecionadas.');
+      }
+    });
+
+    // Excluir uma denúncia individualmente
+    async function deleteDenuncia(id) {
+      if (!confirm(`Deseja excluir a denúncia #${id}?`)) return;
+      try {
+        const res = await fetch(`/api/admin/denuncias/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          loadDashboard();
+        } else {
+          alert('Erro ao excluir a denúncia.');
+        }
+      } catch (e) {
+        alert('Erro de conexão.');
+      }
+    }
+
+    document.getElementById('btn-limpar-base').addEventListener('click', async () => {
+      if (!confirm('ATENÇÃO: Deseja realmente excluir TODAS as denúncias da base de dados?')) return;
 
       try {
         const res = await fetch('/api/admin/denuncias/limpar', { method: 'DELETE' });
@@ -252,7 +290,6 @@
       }
     });
 
-    // Renderizar Métricas
     function renderMetrics(data) {
       document.getElementById('total-count').textContent = data.length;
       document.getElementById('recebidas-count').textContent = data.filter(d => d.status === 'Recebida').length;
@@ -261,13 +298,13 @@
       document.getElementById('result-count').textContent = `Mostrando ${data.length} registo(s)`;
     }
 
-    // Renderizar Tabela
     function renderTable(data) {
       const tbody = document.getElementById('denuncias-tbody');
       tbody.innerHTML = '';
+      document.getElementById('select-all').checked = false;
 
       if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center;">Nenhuma denúncia encontrada.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center;">Nenhuma denúncia encontrada.</td></tr>';
         return;
       }
 
@@ -277,6 +314,7 @@
         const contato = d.tipo_denuncia === 'identified' ? `${d.nome || ''} (${d.email || d.telefone || 'N/A'})` : 'Anónima';
 
         tr.innerHTML = `
+          <td><input type="checkbox" class="row-checkbox" value="${d.id}" /></td>
           <td>#${d.id}</td>
           <td>${new Date(d.criado_em).toLocaleDateString('pt-BR')}</td>
           <td>${d.tipo_denuncia === 'anon' ? 'Anónima' : 'Identificada'}</td>
@@ -284,19 +322,19 @@
           <td title="${d.descricao}">${d.descricao.length > 40 ? d.descricao.slice(0, 40) + '...' : d.descricao}</td>
           <td>${contato}</td>
           <td><span class="status-badge ${badgeClass}">${d.status}</span></td>
-          <td>
+          <td style="display: flex; gap: 8px; align-items: center;">
             <select onchange="updateStatus(${d.id}, this.value)">
               <option value="Recebida" ${d.status === 'Recebida' ? 'selected' : ''}>Recebida</option>
               <option value="Em análise" ${d.status === 'Em análise' ? 'selected' : ''}>Em análise</option>
               <option value="Concluída" ${d.status === 'Concluída' ? 'selected' : ''}>Concluída</option>
             </select>
+            <button class="btn-danger btn-sm" onclick="deleteDenuncia(${d.id})">Excluir</button>
           </td>
         `;
         tbody.appendChild(tr);
       });
     }
 
-    // Alterar Status via PATCH
     async function updateStatus(id, newStatus) {
       try {
         const res = await fetch(`/api/admin/denuncias/${id}`, {
@@ -314,7 +352,6 @@
       }
     }
 
-    // Logout Admin
     document.getElementById('btn-logout').addEventListener('click', async () => {
       await fetch('/api/admin/logout', { method: 'POST' });
       location.reload();
@@ -322,19 +359,16 @@
 
     checkAuth();
 
-    // Renderiza as Barras de Progresso via Analytics
     async function loadAnalyticsProgress() {
       try {
         const res = await fetch('/api/admin/analytics');
         if (!res.ok) return;
         const data = await res.json();
 
-        // 1. Barras de Tipos de Violência
         const violenciaData = data.distribuicoes.violencia;
         const totalViolencia = violenciaData.reduce((acc, item) => acc + item.valor, 0);
         const violenciaContainer = document.getElementById('progress-violencia-container');
         violenciaContainer.innerHTML = '';
-
         const violenciaColors = ['#e63946', '#457b9d', '#f4a261', '#2a9d8f', '#e76f51'];
 
         violenciaData.forEach((item, index) => {
@@ -355,12 +389,10 @@
           `;
         });
 
-        // 2. Barras de Status das Denúncias
         const statusData = data.distribuicoes.status;
         const totalStatus = statusData.reduce((acc, item) => acc + item.valor, 0);
         const statusContainer = document.getElementById('progress-status-container');
         statusContainer.innerHTML = '';
-
         const statusColorMap = {
           'Recebida': '#c92a2a',
           'Em análise': '#e67700',

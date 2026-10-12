@@ -311,7 +311,7 @@ async function route(req, res) {
     return json(res, 200, userReports.all(actor.id));
   }
 
- if (p === '/api/denuncias' && m === 'POST') {
+  if (p === '/api/denuncias' && m === 'POST') {
     if (!rateLimit(req, res, 10)) return;
     const b = await readBody(req);
     const type = b.tipo_denuncia;
@@ -385,7 +385,7 @@ async function route(req, res) {
 
     const status = url.searchParams.get('status');
     const search = url.searchParams.get('q');
-    let sql = 'SELECT id,tipo_denuncia,tipo_violencia,descricao,status,nome,telefone,email,arquivos,criado_em FROM denuncias WHERE excluida_em IS NULL';
+    let sql = 'SELECT id,tipo_denuncia,tipo_violencia,descricao,status,nome,telefone,email,arquivos,criado_em FROM denuncias WHERE 1=1';
     const params = [];
 
     if (['Recebida', 'Em análise', 'Concluída'].includes(status)) {
@@ -412,21 +412,34 @@ async function route(req, res) {
     return json(res, 200, { mensagem: 'Base de dados limpa com sucesso.' });
   }
 
-
-  const pm = p.match(/^\/api\/admin\/denuncias\/(\d+)$/);
-  if (pm && m === 'PATCH') {
+  // 🔒 Bloco unificado para Rotas por ID de Denúncia (DELETE e PATCH)
+  const idMatch = p.match(/^\/api\/admin\/denuncias\/(\d+)$/);
+  if (idMatch) {
     const admin = requireAdmin(req, res);
     if (!admin) return;
-    const id = Number(pm[1]);
+    const id = Number(idMatch[1]);
     const current = reportById.get(id);
-    const b = await readBody(req);
 
-    if (!current || current.excluida_em) return json(res, 404, { erro: 'Denúncia não encontrada.' });
-    if (!['Recebida', 'Em análise', 'Concluída'].includes(b.status)) return json(res, 400, { erro: 'Status inválido.' });
+    if (!current) return json(res, 404, { erro: 'Denúncia não encontrada.' });
 
-    db.prepare('UPDATE denuncias SET status=? WHERE id=? AND excluida_em IS NULL').run(b.status, id);
-    audit(admin.id, id, 'alterar_status', { de: current.status, para: b.status });
-    return json(res, 200, reportById.get(id));
+    // Excluir denúncia individual
+    if (m === 'DELETE') {
+      db.prepare('DELETE FROM denuncias WHERE id=?').run(id);
+      audit(admin.id, id, 'excluir_denuncia_unitaria', {});
+      return json(res, 200, { mensagem: 'Denúncia excluída com sucesso.', id });
+    }
+
+    // Alterar status da denúncia
+    if (m === 'PATCH') {
+      const b = await readBody(req);
+      if (!['Recebida', 'Em análise', 'Concluída'].includes(b.status)) {
+        return json(res, 400, { erro: 'Status inválido.' });
+      }
+
+      db.prepare('UPDATE denuncias SET status=? WHERE id=?').run(b.status, id);
+      audit(admin.id, id, 'alterar_status', { de: current.status, para: b.status });
+      return json(res, 200, reportById.get(id));
+    }
   }
 
   const am = p.match(/^\/api\/admin\/denuncias\/(\d+)\/arquivar$/);
