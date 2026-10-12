@@ -41,8 +41,26 @@ async function submitForm(event) {
   if (!type || !violence || !description) { alert('Preencha todos os campos obrigatórios antes de enviar.'); return; }
   const button = form.querySelector('[type="submit"]'); if (button) button.disabled = true;
   try {
+    // O script de compatibilidade é carregado depois do script principal e
+    // substitui submitForm; por isso a sessão deve ser verificada aqui também.
+    if (type === 'identified') {
+      const sessionResponse = await fetch('/api/me', { method: 'GET', credentials: 'include', headers: { Accept: 'application/json' } });
+      const session = await sessionResponse.json();
+      if (!sessionResponse.ok || !session.user) {
+        alert('Faça login para enviar uma denúncia identificada.');
+        if (typeof switchAuthTab === 'function') switchAuthTab('login');
+        if (typeof openModal === 'function') openModal('auth-modal');
+        return;
+      }
+    }
     const body = {tipo_denuncia:type,tipo_violencia:violence,descricao:description,nome:type==='identified'?document.getElementById('user-name')?.value.trim()||null:null,telefone:type==='identified'?document.getElementById('user-phone')?.value.trim()||null:null,email:type==='identified'?document.getElementById('user-email')?.value.trim()||null:null,arquivos:await Promise.all(selectedFiles.map(readFile))};
-    const response = await fetch('/api/denuncias',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}), data = await response.json();
+    const response = await fetch('/api/denuncias',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(body)}), data = await response.json();
+    if (response.status === 401 && type === 'identified') {
+      alert('Sua sessão expirou. Faça login para enviar uma denúncia identificada.');
+      if (typeof switchAuthTab === 'function') switchAuthTab('login');
+      if (typeof openModal === 'function') openModal('auth-modal');
+      return;
+    }
     if (!response.ok) throw new Error(data.erro || 'Não foi possível enviar a denúncia.');
     alert(`Denúncia recebida. Protocolo: ${data.id}`); resetForm();
   } catch (error) { console.error(error); alert(error.message || 'Erro ao enviar a denúncia.'); }
