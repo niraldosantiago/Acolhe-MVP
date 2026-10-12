@@ -52,6 +52,7 @@ db.exec(`
     telefone TEXT,
     email TEXT,
     arquivos TEXT NOT NULL DEFAULT '[]',
+    ai_analise TEXT NOT NULL DEFAULT '{}',
     criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     excluida_em TEXT,
     FOREIGN KEY (user_id) REFERENCES users(id)
@@ -85,6 +86,7 @@ ensureColumn('denuncias', 'nome', 'TEXT');
 ensureColumn('denuncias', 'telefone', 'TEXT');
 ensureColumn('denuncias', 'email', 'TEXT');
 ensureColumn('denuncias', 'arquivos', "TEXT NOT NULL DEFAULT '[]'");
+ensureColumn('denuncias', 'ai_analise', "TEXT NOT NULL DEFAULT '{}'");
 ensureColumn('denuncias', 'excluida_em', 'TEXT');
 
 // Hashing e Validação Assíncrona de Senhas
@@ -110,9 +112,9 @@ async function checkPassword(password, stored) {
 const userByEmail = db.prepare('SELECT id,email,password_hash,is_admin FROM users WHERE email=?');
 const userById = db.prepare('SELECT id,email,is_admin FROM users WHERE id=?');
 const insertUser = db.prepare('INSERT INTO users(email,password_hash,is_admin) VALUES(?,?,?)');
-const insertReport = db.prepare('INSERT INTO denuncias(user_id,tipo_denuncia,tipo_violencia,descricao,nome,telefone,email,arquivos) VALUES(?,?,?,?,?,?,?,?)');
-const reportById = db.prepare('SELECT id,user_id,tipo_denuncia,tipo_violencia,descricao,status,nome,telefone,email,arquivos,criado_em,excluida_em FROM denuncias WHERE id=?');
-const userReports = db.prepare('SELECT id,tipo_denuncia,tipo_violencia,status,criado_em FROM denuncias WHERE user_id=? AND excluida_em IS NULL ORDER BY id DESC');
+const insertReport = db.prepare('INSERT INTO denuncias(user_id,tipo_denuncia,tipo_violencia,descricao,nome,telefone,email,arquivos,ai_analise) VALUES(?,?,?,?,?,?,?,?,?)');
+const reportById = db.prepare('SELECT id,user_id,tipo_denuncia,tipo_violencia,descricao,status,nome,telefone,email,arquivos,ai_analise,criado_em,excluida_em FROM denuncias WHERE id=?');
+const userReports = db.prepare('SELECT id,tipo_denuncia,tipo_violencia,status,ai_analise,criado_em FROM denuncias WHERE user_id=? AND excluida_em IS NULL ORDER BY id DESC');
 const auditInsert = db.prepare('INSERT INTO auditoria(actor_user_id,denuncia_id,acao,detalhes) VALUES(?,?,?,?)');
 
 // Garantir Administrador Inicial
@@ -234,6 +236,50 @@ function audit(actor, id, action, details = {}) {
   auditInsert.run(actor || null, id || null, action, JSON.stringify(details));
 }
 
+// Módulo de Inteligência Artificial para Triagem de Denúncias
+function analisarTextoComIA(descricao, tipoViolencia) {
+  const texto = String(descricao || '').toLowerCase();
+  
+  const termosCriticos = ['arma', 'sangue', 'ameaça de morte', 'espancado', 'espancada', 'socos', 'faca', 'perigo iminente', 'trancada', 'trancado', 'agressão física grave'];
+  const termosModerados = ['xingou', 'humilhou', 'empurrou', 'controlador', 'ciúme', 'xingamento', 'financeiro'];
+
+  let pontos = 0;
+  let urgencia = 'Baixa';
+  let recomendacoes = ['Acolhimento psicológico padrão', 'Orientações sobre direitos da vítima'];
+
+  const criticoEncontrado = termosCriticos.some(termo => texto.includes(termo));
+  const moderadoEncontrado = termosModerados.some(termo => texto.includes(termo));
+
+  if (criticoEncontrado || tipoViolencia === 'fisica' || tipoViolencia === 'sexual') {
+    pontos = 90;
+    urgencia = 'Alta';
+    recomendacoes = [
+      'Encaminhamento prioritário para rede de proteção de urgência',
+      'Acionamento de suporte policial/emergencial se houver risco atual',
+      'Atendimento psicológico de crise imediato'
+    ];
+  } else if (moderadoEncontrado || tipoViolencia === 'psicologica' || tipoViolencia === 'moral') {
+    pontos = 50;
+    urgencia = 'Média';
+    recomendacoes = [
+      'Agendamento de atendimento de apoio especializado',
+      'Orientação jurídica e social'
+    ];
+  } else {
+    pontos = 20;
+    urgencia = 'Baixa';
+    recomendacoes = ['Disponibilização de cartilhas informativas e canais de escuta'];
+  }
+
+  return {
+    urgencia,
+    pontosRisco: pontos,
+    classificacaoAutomatica: true,
+    recomendacoesSugeridas: recomendacoes,
+    analisadoEm: new Date().toISOString()
+  };
+}
+
 // Anexos
 const allowedTypes = new Set(['image/jpeg', 'image/png', 'application/pdf', 'audio/mpeg', 'audio/wav']);
 
@@ -273,7 +319,7 @@ async function route(req, res) {
   const m = req.method;
   const actor = sessionUser(req);
 
-  if (p === '/api/health' && m === 'GET') return json(res, 200, { ok: true, banco: 'SQLite' });
+  if (p === '/api/health' && m === 'GET') return json(res, 200, { ok: true, banco: 'SQLite', ia: 'Ativa' });
   if (p === '/api/me' && m === 'GET') return json(res, 200, { user: actor || null });
 
   if (p === '/api/register' && m === 'POST') {
@@ -313,21 +359,14 @@ async function route(req, res) {
 
   if (p === '/api/denuncias' && m === 'POST') {
     if (!rateLimit(req, res, 10)) return;
-
-    // A autenticação é exigida no servidor, antes de processar dados enviados pelo cliente.
-    // O cliente não pode indicar user_id para contornar esta verificação.
-    if (req.headers['content-type']?.split(';')[0].trim().toLowerCase() !== 'application/json') {
-      return json(res, 415, { erro: 'Envie a denúncia como application/json.' });
-    }
-    const bodyText = await readBody(req);
-    const type = bodyText.tipo_denuncia;
-    if (type === 'identified' && !actor) {
-      return json(res, 401, { erro: 'Faça login para enviar uma denúncia identificada.' });
-    }
-
-    const b = bodyText;
+    const b = await readBody(req);
+    const type = b.tipo_denuncia;
     const v = String(b.tipo_violencia || '');
     const d = String(b.descricao || '').trim();
+
+    if (type === 'identified' && !actor) {
+      return json(res, 401, { erro: 'Deve efetuar login para enviar uma denúncia identificada.' });
+    }
 
     if (
       !['anon', 'identified'].includes(type) ||
@@ -341,22 +380,26 @@ async function route(req, res) {
     const total = (Array.isArray(b.arquivos) ? b.arquivos : []).reduce((n, x) => n + (Number(x?.size) || 0), 0);
     if (total > 10 * 1024 * 1024) return json(res, 400, { erro: 'O total de anexos excede 10 MB.' });
 
+    // Executa a IA para triagem automática
+    const resultadoIA = analisarTextoComIA(d, v);
+
     const r = insertReport.run(
-      type === 'identified' ? actor.id : null,
+      actor?.id || null,
       type,
       v,
       d,
       type === 'identified' ? String(b.nome || '').slice(0, 200) : null,
       type === 'identified' ? String(b.telefone || '').slice(0, 40) : null,
       type === 'identified' ? String(b.email || '').slice(0, 200) : null,
-      '[]'
+      '[]',
+      JSON.stringify(resultadoIA)
     );
     const id = Number(r.lastInsertRowid);
 
     try {
       const files = await saveFiles(b.arquivos, id);
       db.prepare('UPDATE denuncias SET arquivos=? WHERE id=?').run(JSON.stringify(files), id);
-      return json(res, 201, { id, status: 'Recebida', arquivos: files.map((x) => x.name) });
+      return json(res, 201, { id, status: 'Recebida', ai: resultadoIA, arquivos: files.map((x) => x.name) });
     } catch (e) {
       db.prepare('DELETE FROM denuncias WHERE id=?').run(id);
       return json(res, e.status || 400, { erro: e.message });
@@ -391,7 +434,7 @@ async function route(req, res) {
 
     const status = url.searchParams.get('status');
     const search = url.searchParams.get('q');
-    let sql = 'SELECT id,tipo_denuncia,tipo_violencia,descricao,status,nome,telefone,email,arquivos,criado_em FROM denuncias WHERE 1=1';
+    let sql = 'SELECT id,tipo_denuncia,tipo_violencia,descricao,status,nome,telefone,email,arquivos,ai_analise,criado_em FROM denuncias WHERE 1=1';
     const params = [];
 
     if (['Recebida', 'Em análise', 'Concluída'].includes(status)) {
@@ -418,7 +461,7 @@ async function route(req, res) {
     return json(res, 200, { mensagem: 'Base de dados limpa com sucesso.' });
   }
 
-  // 🔒 Bloco unificado para Rotas por ID de Denúncia (DELETE e PATCH)
+  // Rotas por ID de Denúncia (DELETE e PATCH unificados)
   const idMatch = p.match(/^\/api\/admin\/denuncias\/(\d+)$/);
   if (idMatch) {
     const admin = requireAdmin(req, res);
@@ -428,14 +471,12 @@ async function route(req, res) {
 
     if (!current) return json(res, 404, { erro: 'Denúncia não encontrada.' });
 
-    // Excluir denúncia individual
     if (m === 'DELETE') {
       db.prepare('DELETE FROM denuncias WHERE id=?').run(id);
       audit(admin.id, id, 'excluir_denuncia_unitaria', {});
       return json(res, 200, { mensagem: 'Denúncia excluída com sucesso.', id });
     }
 
-    // Alterar status da denúncia
     if (m === 'PATCH') {
       const b = await readBody(req);
       if (!['Recebida', 'Em análise', 'Concluída'].includes(b.status)) {
@@ -446,21 +487,6 @@ async function route(req, res) {
       audit(admin.id, id, 'alterar_status', { de: current.status, para: b.status });
       return json(res, 200, reportById.get(id));
     }
-  }
-
-  const am = p.match(/^\/api\/admin\/denuncias\/(\d+)\/arquivar$/);
-  if (am && m === 'POST') {
-    const admin = requireAdmin(req, res);
-    if (!admin) return;
-    const id = Number(am[1]);
-    const current = reportById.get(id);
-
-    if (!current || current.excluida_em) return json(res, 404, { erro: 'Denúncia não encontrada.' });
-    const b = await readBody(req);
-
-    db.prepare('UPDATE denuncias SET excluida_em=? WHERE id=? AND excluida_em IS NULL').run(new Date().toISOString(), id);
-    audit(admin.id, id, 'arquivar_denuncia', { motivo: String(b.motivo || '').slice(0, 500) });
-    return json(res, 200, { mensagem: 'Denúncia arquivada.', id });
   }
 
   if (p === '/api/admin/auditoria' && m === 'GET') {
@@ -586,5 +612,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT} [Ambiente: ${IS_PROD ? 'Produção' : 'Desenvolvimento'}]`);
+  console.log(`Servidor rodando na porta ${PORT} [Ambiente: ${IS_PROD ? 'Produção' : 'Desenvolvimento'}] com IA de Triagem.`);
 });
