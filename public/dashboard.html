@@ -51,9 +51,9 @@
     /* Tabela de Denúncias */
     .table-container { background: var(--card-bg); padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    th, td { text-align: left; padding: 12px; border-bottom: 1px solid var(--border); font-size: 14px; }
+    th, td { text-align: left; padding: 12px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
     th { background-color: #f1f3f5; font-weight: 600; }
-    .status-badge { padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+    .status-badge { padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; display: inline-block; }
     .status-recebida { background: #ffe3e3; color: #c92a2a; }
     .status-analise { background: #fff3bf; color: #e67700; }
     .status-concluida { background: #d3f9d8; color: #2b8a3e; }
@@ -150,6 +150,7 @@
           <th>Tipo</th>
           <th>Violência</th>
           <th>Descrição</th>
+          <th>IA / Triagem</th>
           <th>Contacto</th>
           <th>Status</th>
           <th>Ações</th>
@@ -157,7 +158,7 @@
       </thead>
       <tbody id="denuncias-tbody">
         <tr>
-          <td colspan="9" style="text-align: center;">A carregar dados...</td>
+          <td colspan="10" style="text-align: center;">A carregar dados...</td>
         </tr>
       </tbody>
     </table>
@@ -304,7 +305,7 @@
       document.getElementById('select-all').checked = false;
 
       if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center;">Nenhuma denúncia encontrada.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align: center;">Nenhuma denúncia encontrada.</td></tr>';
         return;
       }
 
@@ -313,6 +314,27 @@
         const badgeClass = d.status === 'Recebida' ? 'status-recebida' : d.status === 'Em análise' ? 'status-analise' : 'status-concluida';
         const contato = d.tipo_denuncia === 'identified' ? `${d.nome || ''} (${d.email || d.telefone || 'N/A'})` : 'Anónima';
 
+        // Processamento do campo JSON de Inteligência Artificial
+        let iaHtml = '<span style="color: #666;">Pendente</span>';
+        try {
+          const ai = JSON.parse(d.ai_analise || '{}');
+          if (ai.urgencia) {
+            const cor = ai.urgencia === 'Alta' ? '#e63946' : ai.urgencia === 'Média' ? '#f4a261' : '#2a9d8f';
+            iaHtml = `
+              <div>
+                <span style="background: ${cor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; display: inline-block; margin-bottom: 3px;">
+                  ${ai.urgencia} (${ai.pontosRisco}pts)
+                </span>
+                <div style="font-size: 11px; color: #555; max-width: 200px; line-height: 1.2;">
+                  ${(ai.recomendacoesSugeridas || []).slice(0, 1).join('')}
+                </div>
+              </div>
+            `;
+          }
+        } catch {
+          iaHtml = '<span style="color: #999;">-</span>';
+        }
+
         tr.innerHTML = `
           <td><input type="checkbox" class="row-checkbox" value="${d.id}" /></td>
           <td>#${d.id}</td>
@@ -320,6 +342,7 @@
           <td>${d.tipo_denuncia === 'anon' ? 'Anónima' : 'Identificada'}</td>
           <td style="text-transform: capitalize;">${d.tipo_violencia}</td>
           <td title="${d.descricao}">${d.descricao.length > 40 ? d.descricao.slice(0, 40) + '...' : d.descricao}</td>
+          <td>${iaHtml}</td>
           <td>${contato}</td>
           <td><span class="status-badge ${badgeClass}">${d.status}</span></td>
           <td style="display: flex; gap: 8px; align-items: center;">
@@ -364,6 +387,9 @@
         const res = await fetch('/api/admin/analytics');
         if (!res.ok) return;
         const data = await res.json();
+
+        // Se o endpoint de analytics retornar a estrutura completa com distribuições:
+        if (!data.distribuicoes) return;
 
         const violenciaData = data.distribuicoes.violencia;
         const totalViolencia = violenciaData.reduce((acc, item) => acc + item.valor, 0);
@@ -420,30 +446,6 @@
         console.error('Erro ao carregar dados de progresso:', err);
       }
     }
-
-    function formatarIA(aiJsonStr) {
-  try {
-    const ai = JSON.parse(aiJsonStr || '{}');
-    if (!ai.urgencia) return '<span style="color: #666;">Pendente</span>';
-
-    const cor = ai.urgencia === 'Alta' ? '#e63946' : ai.urgencia === 'Média' ? '#f4a261' : '#2a9d8f';
-    return `
-      <div>
-        <span style="background: ${cor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;">
-          ${ai.urgencia} (${ai.pontosRisco} pts)
-        </span>
-        <div style="font-size: 11px; color: #555; margin-top: 4px;">
-          ${(ai.recomendacoesSugeridas || []).slice(0, 1).join('')}
-        </div>
-      </div>
-    `;
-  } catch {
-    return '-';
-  }
-}
-
-
-
   </script>
 </body>
 </html>
