@@ -420,6 +420,30 @@
         console.error('Erro ao carregar dados de progresso:', err);
       }
     }
+
+    function formatarIA(aiJsonStr) {
+  try {
+    const ai = JSON.parse(aiJsonStr || '{}');
+    if (!ai.urgencia) return '<span style="color: #666;">Pendente</span>';
+
+    const cor = ai.urgencia === 'Alta' ? '#e63946' : ai.urgencia === 'Média' ? '#f4a261' : '#2a9d8f';
+    return `
+      <div>
+        <span style="background: ${cor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;">
+          ${ai.urgencia} (${ai.pontosRisco} pts)
+        </span>
+        <div style="font-size: 11px; color: #555; margin-top: 4px;">
+          ${(ai.recomendacoesSugeridas || []).slice(0, 1).join('')}
+        </div>
+      </div>
+    `;
+  } catch {
+    return '-';
+  }
+}
+
+
+
   </script>
 </body>
 </html>
