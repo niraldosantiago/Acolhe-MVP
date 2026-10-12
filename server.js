@@ -313,15 +313,21 @@ async function route(req, res) {
 
   if (p === '/api/denuncias' && m === 'POST') {
     if (!rateLimit(req, res, 10)) return;
-    const b = await readBody(req);
-    const type = b.tipo_denuncia;
+
+    // A autenticação é exigida no servidor, antes de processar dados enviados pelo cliente.
+    // O cliente não pode indicar user_id para contornar esta verificação.
+    if (req.headers['content-type']?.split(';')[0].trim().toLowerCase() !== 'application/json') {
+      return json(res, 415, { erro: 'Envie a denúncia como application/json.' });
+    }
+    const bodyText = await readBody(req);
+    const type = bodyText.tipo_denuncia;
+    if (type === 'identified' && !actor) {
+      return json(res, 401, { erro: 'Faça login para enviar uma denúncia identificada.' });
+    }
+
+    const b = bodyText;
     const v = String(b.tipo_violencia || '');
     const d = String(b.descricao || '').trim();
-
-    // 🔒 VALIDAÇÃO RIGOROSA: Impede denúncias identificadas sem sessão ativa
-    if (type === 'identified' && !actor) {
-      return json(res, 401, { erro: 'Deve efetuar login para enviar uma denúncia identificada.' });
-    }
 
     if (
       !['anon', 'identified'].includes(type) ||
@@ -336,7 +342,7 @@ async function route(req, res) {
     if (total > 10 * 1024 * 1024) return json(res, 400, { erro: 'O total de anexos excede 10 MB.' });
 
     const r = insertReport.run(
-      actor?.id || null,
+      type === 'identified' ? actor.id : null,
       type,
       v,
       d,

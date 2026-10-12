@@ -422,6 +422,28 @@ async function submitForm(e) {
     return;
   }
 
+  // Checagem de experiência do usuário; a API /api/denuncias também deve
+  // bloquear identificadas sem sessão, pois validação no navegador não é segurança.
+  if (tipoDenuncia === 'identified') {
+    try {
+      const sessao = await fetch('/api/me', {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Accept': 'application/json' }
+      });
+      const estado = await sessao.json();
+      if (!sessao.ok || !estado.user) {
+        alert('Faça login para enviar uma denúncia identificada.');
+        if (typeof switchAuthTab === 'function') switchAuthTab('login');
+        return;
+      }
+    } catch (erro) {
+      console.error('Não foi possível verificar a sessão:', erro);
+      alert('Não foi possível verificar seu login. Tente novamente.');
+      return;
+    }
+  }
+
   // Prepara os ficheiros convertendo-os em Base64
   let arquivosPayload = [];
   try {
