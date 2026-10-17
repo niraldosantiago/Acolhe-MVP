@@ -86,6 +86,7 @@
   <div class="header">
     <h1>Dashboard de Denúncias</h1>
     <div class="header-actions">
+      <button class="btn-warning btn-sm" id="btn-toggle-auditoria">Mostrar Auditoria</button>
       <button class="btn-danger btn-sm" id="btn-excluir-selecionadas">Excluir Selecionadas</button>
       <button class="btn-warning" id="btn-limpar-base">Limpar Banco de Dados</button>
       <button class="btn-danger" id="btn-logout">Sair</button>
@@ -164,6 +165,30 @@
     </table>
   </div>
 
+  <!-- Tabela de Logs de Auditoria (Ocultável) -->
+  <div id="auditoria-container" class="table-container hidden" style="margin-top: 30px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+      <h2>Logs de Auditoria e Rastreabilidade</h2>
+      <button class="btn-warning btn-sm" id="btn-limpar-auditoria">Limpar Logs de Auditoria</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Data / Hora</th>
+          <th>Operador</th>
+          <th>Ação</th>
+          <th>Detalhes</th>
+        </tr>
+      </thead>
+      <tbody id="auditoria-tbody">
+        <tr>
+          <td colspan="5" style="text-align: center;">A carregar logs de auditoria...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
   <script>
     async function checkAuth() {
       try {
@@ -207,6 +232,37 @@
       }
     });
 
+    // Alternar visibilidade da auditoria
+    document.getElementById('btn-toggle-auditoria').addEventListener('click', () => {
+      const container = document.getElementById('auditoria-container');
+      const btn = document.getElementById('btn-toggle-auditoria');
+      
+      container.classList.toggle('hidden');
+      if (container.classList.contains('hidden')) {
+        btn.textContent = 'Mostrar Auditoria';
+      } else {
+        btn.textContent = 'Ocultar Auditoria';
+      }
+    });
+
+    // Limpar apenas os logs de auditoria
+    document.getElementById('btn-limpar-auditoria').addEventListener('click', async () => {
+      if (!confirm('Deseja realmente limpar todos os logs de auditoria?')) return;
+
+      try {
+        const res = await fetch('/api/admin/auditoria/limpar', { method: 'DELETE' });
+        const data = await res.json();
+        if (res.ok) {
+          alert('Logs de auditoria limpos com sucesso.');
+          loadAuditoria();
+        } else {
+          alert(data.erro || 'Erro ao limpar logs de auditoria.');
+        }
+      } catch (e) {
+        alert('Erro ao conectar ao servidor.');
+      }
+    });
+
     async function loadDashboard() {
       const query = document.getElementById('search-input').value.trim();
       let url = '/api/admin/denuncias';
@@ -222,8 +278,47 @@
         renderMetrics(denuncias);
         renderTable(denuncias);
         loadAnalyticsProgress();
+        loadAuditoria();
       } catch (err) {
         console.error(err.message);
+      }
+    }
+
+    async function loadAuditoria() {
+      try {
+        const res = await fetch('/api/admin/auditoria');
+        if (!res.ok) return;
+        const logs = await res.json();
+
+        const tbody = document.getElementById('auditoria-tbody');
+        tbody.innerHTML = '';
+
+        if (!Array.isArray(logs) || logs.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Nenhum registo de auditoria encontrado.</td></tr>';
+          return;
+        }
+
+        logs.forEach(log => {
+          const tr = document.createElement('tr');
+          let detalhesTexto = '-';
+          try {
+            const d = JSON.parse(log.detalhes || '{}');
+            detalhesTexto = Object.keys(d).length ? JSON.stringify(d) : '-';
+          } catch {
+            detalhesTexto = log.detalhes || '-';
+          }
+
+          tr.innerHTML = `
+            <td>#${log.id}</td>
+            <td>${new Date(log.criado_em).toLocaleString('pt-BR')}</td>
+            <td>${log.operador || 'Sistema / Admin'}</td>
+            <td><strong style="color: #457b9d;">${log.acao}</strong></td>
+            <td style="font-size: 12px; color: #555; font-family: monospace;">${detalhesTexto}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error('Erro ao carregar auditoria:', err);
       }
     }
 
@@ -232,13 +327,11 @@
       if (e.key === 'Enter') loadDashboard();
     });
 
-    // Selecionar / Deselecionar todos
     document.getElementById('select-all').addEventListener('change', (e) => {
       const checkboxes = document.querySelectorAll('.row-checkbox');
       checkboxes.forEach(cb => cb.checked = e.target.checked);
     });
 
-    // Excluir denúncias selecionadas
     document.getElementById('btn-excluir-selecionadas').addEventListener('click', async () => {
       const selected = Array.from(document.querySelectorAll('.row-checkbox:checked')).map(cb => cb.value);
       if (selected.length === 0) {
@@ -259,7 +352,6 @@
       }
     });
 
-    // Excluir uma denúncia individualmente
     async function deleteDenuncia(id) {
       if (!confirm(`Deseja excluir a denúncia #${id}?`)) return;
       try {
@@ -314,7 +406,6 @@
         const badgeClass = d.status === 'Recebida' ? 'status-recebida' : d.status === 'Em análise' ? 'status-analise' : 'status-concluida';
         const contato = d.tipo_denuncia === 'identified' ? `${d.nome || ''} (${d.email || d.telefone || 'N/A'})` : 'Anónima';
 
-        // Processamento do campo JSON de Inteligência Artificial
         let iaHtml = '<span style="color: #666;">Pendente</span>';
         try {
           const ai = JSON.parse(d.ai_analise || '{}');
@@ -388,7 +479,6 @@
         if (!res.ok) return;
         const data = await res.json();
 
-        // Se o endpoint de analytics retornar a estrutura completa com distribuições:
         if (!data.distribuicoes) return;
 
         const violenciaData = data.distribuicoes.violencia;

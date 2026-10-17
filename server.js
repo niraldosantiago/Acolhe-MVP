@@ -464,6 +464,32 @@ async function route(req, res) {
     return json(res, 200, { mensagem: 'Base de dados limpa com sucesso.' });
   }
 
+  if (p === '/api/admin/auditoria' && m === 'GET') {
+    const admin = requireAdmin(req, res);
+    if (!admin) return;
+    
+    audit(admin.id, null, 'listar_auditoria');
+    const logs = db.prepare(`
+      SELECT a.id, a.acao, a.detalhes, a.criado_em, u.email AS operador
+      FROM auditoria a
+      LEFT JOIN users u ON a.actor_user_id = u.id
+      ORDER BY a.id DESC
+      LIMIT 100
+    `).all();
+    
+    return json(res, 200, logs);
+  }
+
+  if (p === '/api/admin/auditoria/limpar' && m === 'DELETE') {
+    const admin = requireAdmin(req, res);
+    if (!admin) return;
+    
+    db.prepare('DELETE FROM auditoria').run();
+    audit(admin.id, null, 'limpar_logs_auditoria');
+    
+    return json(res, 200, { mensagem: 'Logs de auditoria limpos com sucesso.' });
+  }
+
   // Rotas por ID de Denúncia (DELETE e PATCH unificados)
   const idMatch = p.match(/^\/api\/admin\/denuncias\/(\d+)$/);
   if (idMatch) {
@@ -490,17 +516,6 @@ async function route(req, res) {
       audit(admin.id, id, 'alterar_status', { de: current.status, para: b.status });
       return json(res, 200, reportById.get(id));
     }
-  }
-
-  if (p === '/api/admin/auditoria' && m === 'GET') {
-    const admin = requireAdmin(req, res);
-    if (!admin) return;
-    audit(admin.id, null, 'listar_auditoria');
-    return json(
-      res,
-      200,
-      db.prepare('SELECT a.id,a.acao,a.detalhes,a.criado_em,u.email AS operador FROM auditoria a LEFT JOIN users u ON u.id=a.actor_user_id ORDER BY a.id DESC LIMIT 500').all()
-    );
   }
 
   if (p === '/api/admin/analytics' && m === 'GET') {
