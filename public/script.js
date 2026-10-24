@@ -676,7 +676,7 @@ function sendChatMessage() {
 // --- FUNÇÃO DE SAÍDA RÁPIDA ---
 function quickExit() {
   // Saída rápida apenas navega; não apaga histórico, sessão nem dados do servidor.
-  window.location.replace('about:blank');
+  window.location.replace('https://shopee.com.br/');
 }
 
 document.addEventListener("keydown", function (event) {
