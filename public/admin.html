@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard de Denúncias - Acolhe</title>
+  <style>
+    :root {
+      --primary: #e91e63;
+      --bg: #f8f9fa;
+      --card-bg: #ffffff;
+      --text: #2b2d42;
+      --border: #e0e0e0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 20px; }
+
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; background: var(--card-bg); padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); flex-wrap: wrap; gap: 15px; }
+    .header h1 { color: var(--primary); font-size: 24px; }
+    .header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    
+    .btn-danger { background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; }
+    .btn-danger:hover { background: #df3f04; }
+    .btn-warning { background: #e91e63; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; }
+    .btn-warning:hover { background: #df3f04; }
+    .btn-sm { padding: 4px 8px; font-size: 12px; }
+
+    /* Barra de Ferramentas / Busca */
+    .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: var(--card-bg); padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); gap: 15px; flex-wrap: wrap; }
+    .search-box { display: flex; gap: 10px; width: 100%; max-width: 400px; }
+    .search-box input { flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px; }
+
+    /* Métricas */
+    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 25px; }
+    .metric-card { background: var(--card-bg); padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: center; }
+    .metric-card h3 { font-size: 14px; color: #6c757d; margin-bottom: 10px; }
+    .metric-card .number { font-size: 32px; font-weight: bold; color: var(--primary); }
+
+    /* Seção de Barras de Progresso */
+    .progress-section { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 25px; }
+    .progress-card { background: var(--card-bg); padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .progress-card h3 { margin-bottom: 15px; font-size: 16px; color: var(--text); }
+    
+    .progress-item { margin-bottom: 15px; }
+    .progress-item:last-child { margin-bottom: 0; }
+    .progress-header { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+    .progress-track { width: 100%; height: 10px; background-color: #e9ecef; border-radius: 5px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 5px; transition: width 0.4s ease; }
+
+    /* Tabela de Denúncias */
+    .table-container { background: var(--card-bg); padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { text-align: left; padding: 12px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
+    th { background-color: #f1f3f5; font-weight: 600; }
+    .status-badge { padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; display: inline-block; }
+    .status-recebida { background: #ffe3e3; color: #c92a2a; }
+    .status-analise { background: #fff3bf; color: #e67700; }
+    .status-concluida { background: #d3f9d8; color: #2b8a3e; }
+
+    /* Modal / Login */
+    #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
+    .login-box { background: white; padding: 30px; border-radius: 8px; width: 100%; max-width: 380px; text-align: center; }
+    .login-box input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid var(--border); border-radius: 4px; }
+    .login-box button { width: 100%; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- Modal de Login Admin -->
+  <div id="login-overlay">
+    <div class="login-box">
+      <h2>Acesso Administrativo</h2>
+      <p style="font-size: 12px; color: #666; margin-top: 5px;">Aceda para visualizar o dashboard</p>
+      <form id="admin-login-form" style="margin-top: 15px;">
+        <input type="email" id="email" placeholder="E-mail"  required />
+        <input type="password" id="password" placeholder="Senha"  required />
+        <button type="submit">Entrar</button>
+      </form>
+      <p id="login-error" style="color: red; font-size: 12px; margin-top: 10px;" class="hidden"></p>
+    </div>
+  </div>
+
+  <!-- Cabeçalho -->
+  <div class="header">
+    <h1>Dashboard de Denúncias</h1>
+    <div class="header-actions">
+      <button class="btn-warning btn-sm" id="btn-export-csv" style="background-color: #2a9d8f;">Baixar Dataset (CSV)</button>
+      <button class="btn-warning btn-sm" id="btn-toggle-auditoria">Mostrar Auditoria</button>
+      <button class="btn-danger btn-sm" id="btn-excluir-selecionadas">Excluir Selecionadas</button>
+      <button class="btn-warning" id="btn-limpar-base">Limpar Banco de Dados</button>
+      <button class="btn-danger" id="btn-logout">Sair</button>
+    </div>
+  </div>
+
+  <!-- Barra de Ferramentas / Busca -->
+  <div class="toolbar">
+    <div class="search-box">
+      <input type="text" id="search-input" placeholder="Pesquisar por ID, descrição ou e-mail..." />
+      <button class="btn-danger" id="btn-search" style="padding: 8px 12px;">Pesquisar</button>
+    </div>
+    <div style="font-size: 13px; color: #6c757d;" id="result-count">A carregar registos...</div>
+  </div>
+
+  <!-- Cards de Métricas -->
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <h3>Total de Denúncias</h3>
+      <div class="number" id="total-count">0</div>
+    </div>
+    <div class="metric-card">
+      <h3>Recebidas</h3>
+      <div class="number" id="recebidas-count">0</div>
+    </div>
+    <div class="metric-card">
+      <h3>Em Análise</h3>
+      <div class="number" id="analise-count">0</div>
+    </div>
+    <div class="metric-card">
+      <h3>Concluídas</h3>
+      <div class="number" id="concluidas-count">0</div>
+    </div>
+  </div>
+
+  <!-- Seção de Barras de Progresso -->
+  <div class="progress-section">
+    <div class="progress-card">
+      <h3>Tipos de Violência</h3>
+      <div id="progress-violencia-container">
+        <p style="font-size: 13px; color: #888;">A carregar dados...</p>
+      </div>
+    </div>
+
+    <div class="progress-card">
+      <h3>Denúncias por Status</h3>
+      <div id="progress-status-container">
+        <p style="font-size: 13px; color: #888;">A carregar dados...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabela de Registos -->
+  <div class="table-container">
+    <h2>Registos de Denúncias</h2>
+    <table>
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="select-all" /></th>
+          <th>ID</th>
+          <th>Data</th>
+          <th>Tipo</th>
+          <th>Violência</th>
+          <th>Descrição</th>
+          <th>IA / Triagem</th>
+          <th>Contacto</th>
+          <th>Status</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody id="denuncias-tbody">
+        <tr>
+          <td colspan="10" style="text-align: center;">A carregar dados...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Tabela de Logs de Auditoria (Ocultável) -->
+  <div id="auditoria-container" class="table-container hidden" style="margin-top: 30px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+      <h2>Logs de Auditoria e Rastreabilidade</h2>
+      <button class="btn-warning btn-sm" id="btn-limpar-auditoria">Limpar Logs de Auditoria</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Data / Hora</th>
+          <th>Operador</th>
+          <th>Ação</th>
+          <th>Detalhes</th>
+        </tr>
+      </thead>
+      <tbody id="auditoria-tbody">
+        <tr>
+          <td colspan="5" style="text-align: center;">A carregar logs de auditoria...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const esc = (v) => String(v ?? '').replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
+
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/admin/me');
+        if (res.ok) {
+          document.getElementById('login-overlay').classList.add('hidden');
+          loadDashboard();
+        } else {
+          document.getElementById('login-overlay').classList.remove('hidden');
+        }
+      } catch (e) {
+        document.getElementById('login-overlay').classList.remove('hidden');
+      }
+    }
+
+    document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const errEl = document.getElementById('login-error');
+
+      try {
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+          errEl.classList.add('hidden');
+          document.getElementById('login-overlay').classList.add('hidden');
+          loadDashboard();
+        } else {
+          errEl.textContent = data.erro || 'Falha na autenticação';
+          errEl.classList.remove('hidden');
+        }
+      } catch (err) {
+        errEl.textContent = 'Erro ao conectar ao servidor.';
+        errEl.classList.remove('hidden');
+      }
+    });
+
+    // Evento para baixar o Dataset em CSV
+    document.getElementById('btn-export-csv').addEventListener('click', () => {
+      window.location.href = '/api/admin/export/csv';
+    });
+
+    // Alternar visibilidade da auditoria
+    document.getElementById('btn-toggle-auditoria').addEventListener('click', () => {
+      const container = document.getElementById('auditoria-container');
+      const btn = document.getElementById('btn-toggle-auditoria');
+      
+      container.classList.toggle('hidden');
+      if (container.classList.contains('hidden')) {
+        btn.textContent = 'Mostrar Auditoria';
+      } else {
+        btn.textContent = 'Ocultar Auditoria';
+      }
+    });
+
+    // Limpar apenas os logs de auditoria
+    document.getElementById('btn-limpar-auditoria').addEventListener('click', async () => {
+      if (!confirm('Deseja realmente limpar todos os logs de auditoria?')) return;
+
+      try {
+        const res = await fetch('/api/admin/auditoria/limpar', { method: 'DELETE' });
+        const data = await res.json();
+        if (res.ok) {
+          alert('Logs de auditoria limpos com sucesso.');
+          loadAuditoria();
+        } else {
+          alert(data.erro || 'Erro ao limpar logs de auditoria.');
+        }
+      } catch (e) {
+        alert('Erro ao conectar ao servidor.');
+      }
+    });
+
+    async function loadDashboard() {
+      const query = document.getElementById('search-input').value.trim();
+      let url = '/api/admin/denuncias';
+      if (query) {
+        url += `?q=${encodeURIComponent(query)}`;
+      }
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Não foi possível carregar os dados.');
+        const denuncias = await res.json();
+
+        renderMetrics(denuncias);
+        renderTable(denuncias);
+        loadAnalyticsProgress();
+        loadAuditoria();
+      } catch (err) {
+        console.error(err.message);
+      }
+    }
+
+    async function loadAuditoria() {
+      try {
+        const res = await fetch('/api/admin/auditoria');
+        if (!res.ok) return;
+        const logs = await res.json();
+
+        const tbody = document.getElementById('auditoria-tbody');
+        tbody.innerHTML = '';
+
+        if (!Array.isArray(logs) || logs.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Nenhum registo de auditoria encontrado.</td></tr>';
+          return;
+        }
+
+        logs.forEach(log => {
+          const tr = document.createElement('tr');
+          let detalhesTexto = '-';
+          try {
+            const d = JSON.parse(log.detalhes || '{}');
+            detalhesTexto = Object.keys(d).length ? JSON.stringify(d) : '-';
+          } catch {
+            detalhesTexto = log.detalhes || '-';
+          }
+
+          tr.innerHTML = `
+            <td>#${log.id}</td>
+            <td>${new Date(log.criado_em).toLocaleString('pt-BR')}</td>
+            <td>${esc(log.operador || 'Sistema / Admin')}</td>
+            <td><strong style="color: #457b9d;">${esc(log.acao)}</strong></td>
+            <td style="font-size: 12px; color: #555; font-family: monospace;">${esc(detalhesTexto)}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error('Erro ao carregar auditoria:', err);
+      }
+    }
+
+    document.getElementById('btn-search').addEventListener('click', () => loadDashboard());
+    document.getElementById('search-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') loadDashboard();
+    });
+
+    document.getElementById('select-all').addEventListener('change', (e) => {
+      const checkboxes = document.querySelectorAll('.row-checkbox');
+      checkboxes.forEach(cb => cb.checked = e.target.checked);
+    });
+
+    document.getElementById('btn-excluir-selecionadas').addEventListener('click', async () => {
+      const selected = Array.from(document.querySelectorAll('.row-checkbox:checked')).map(cb => cb.value);
+      if (selected.length === 0) {
+        alert('Selecione pelo menos uma denúncia para excluir.');
+        return;
+      }
+
+      if (!confirm(`Deseja realmente excluir as ${selected.length} denúncia(s) selecionada(s)?`)) return;
+
+      try {
+        for (const id of selected) {
+          await fetch(`/api/admin/denuncias/${id}`, { method: 'DELETE' });
+        }
+        alert('Denúncias selecionadas excluídas com sucesso.');
+        loadDashboard();
+      } catch (e) {
+        alert('Erro ao excluir as denúncias selecionadas.');
+      }
+    });
+
+    async function deleteDenuncia(id) {
+      if (!confirm(`Deseja excluir a denúncia #${id}?`)) return;
+      try {
+        const res = await fetch(`/api/admin/denuncias/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          loadDashboard();
+        } else {
+          alert('Erro ao excluir a denúncia.');
+        }
+      } catch (e) {
+        alert('Erro de conexão.');
+      }
+    }
+
+    document.getElementById('btn-limpar-base').addEventListener('click', async () => {
+      if (!confirm('ATENÇÃO: Deseja realmente excluir TODAS as denúncias da base de dados?')) return;
+
+      try {
+        const res = await fetch('/api/admin/denuncias/limpar', { method: 'DELETE' });
+        const data = await res.json();
+        if (res.ok) {
+          alert('Base de dados limpa com sucesso.');
+          loadDashboard();
+        } else {
+          alert(data.erro || 'Erro ao limpar a base de dados.');
+        }
+      } catch (e) {
+        alert('Erro de conexão ao tentar limpar a base.');
+      }
+    });
+
+    function renderMetrics(data) {
+      document.getElementById('total-count').textContent = data.length;
+      document.getElementById('recebidas-count').textContent = data.filter(d => d.status === 'Recebida').length;
+      document.getElementById('analise-count').textContent = data.filter(d => d.status === 'Em análise').length;
+      document.getElementById('concluidas-count').textContent = data.filter(d => d.status === 'Concluída').length;
+      document.getElementById('result-count').textContent = `Mostrando ${data.length} registo(s)`;
+    }
+
+    function renderTable(data) {
+      const tbody = document.getElementById('denuncias-tbody');
+      tbody.innerHTML = '';
+      document.getElementById('select-all').checked = false;
+
+      if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align: center;">Nenhuma denúncia encontrada.</td></tr>';
+        return;
+      }
+
+      data.forEach(d => {
+        const tr = document.createElement('tr');
+        const badgeClass = d.status === 'Recebida' ? 'status-recebida' : d.status === 'Em análise' ? 'status-analise' : 'status-concluida';
+        const contato = d.tipo_denuncia === 'identified' ? `${d.nome || ''} (${d.email || d.telefone || 'N/A'})` : 'Anónima';
+
+        const violenciaLabels = {
+          'fisica': 'Física',
+          'psicologica': 'Psicológica',
+          'patrimonial': 'Patrimonial',
+          'sexual': 'Sexual',
+          'moral': 'Moral',
+          'cibernetica': 'Cibernética',
+          'institucional': 'Institucional'
+        };
+        const labelViolencia = violenciaLabels[d.tipo_violencia] || (d.tipo_violencia.charAt(0).toUpperCase() + d.tipo_violencia.slice(1));
+
+        let iaHtml = '<span style="color: #666;">Pendente</span>';
+        try {
+          const ai = JSON.parse(d.ai_analise || '{}');
+          if (ai.urgencia) {
+            const cor = ai.urgencia === 'Alta' ? '#e63946' : ai.urgencia === 'Média' ? '#f4a261' : '#2a9d8f';
+            iaHtml = `
+              <div>
+                <span style="background: ${cor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; display: inline-block; margin-bottom: 3px;">
+                  ${esc(ai.urgencia)} (${esc(ai.pontosRisco)}pts)
+                </span>
+                <div style="font-size: 11px; color: #555; max-width: 200px; line-height: 1.2;">
+                  ${esc((ai.recomendacoesSugeridas || []).slice(0, 1).join(''))}
+                </div>
+              </div>
+            `;
+          }
+        } catch {
+          iaHtml = '<span style="color: #999;">-</span>';
+        }
+
+        tr.innerHTML = `
+          <td><input type="checkbox" class="row-checkbox" value="${esc(d.id)}" /></td>
+          <td>#${esc(d.id)}</td>
+          <td>${new Date(d.criado_em).toLocaleDateString('pt-BR')}</td>
+          <td>${d.tipo_denuncia === 'anon' ? 'Anónima' : 'Identificada'}</td>
+          <td style="font-weight: 500;">${esc(labelViolencia)}</td>
+          <td title="${esc(d.descricao)}">${d.descricao.length > 40 ? d.descricao.slice(0, 40) + '...' : d.descricao}</td>
+          <td>${iaHtml}</td>
+          <td>${esc(contato)}</td>
+          <td><span class="status-badge ${badgeClass}">${esc(d.status)}</span></td>
+          <td style="display: flex; gap: 8px; align-items: center;">
+            <select onchange="updateStatus(${esc(d.id)}, this.value)">
+              <option value="Recebida" ${d.status === 'Recebida' ? 'selected' : ''}>Recebida</option>
+              <option value="Em análise" ${d.status === 'Em análise' ? 'selected' : ''}>Em análise</option>
+              <option value="Concluída" ${d.status === 'Concluída' ? 'selected' : ''}>Concluída</option>
+            </select>
+            <button class="btn-danger btn-sm" onclick="deleteDenuncia(${esc(d.id)})">Excluir</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function updateStatus(id, newStatus) {
+      try {
+        const res = await fetch(`/api/admin/denuncias/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus })
+        });
+        if (res.ok) {
+          loadDashboard();
+        } else {
+          alert('Erro ao atualizar status.');
+        }
+      } catch (e) {
+        alert('Erro ao ligar ao servidor.');
+      }
+    }
+
+    document.getElementById('btn-logout').addEventListener('click', async () => {
+      await fetch('/api/admin/logout', { method: 'POST' });
+      location.reload();
+    });
+
+    checkAuth();
+
+    async function loadAnalyticsProgress() {
+      try {
+        const res = await fetch('/api/admin/analytics');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (!data.distribuicoes) return;
+
+        const violenciaData = data.distribuicoes.violencia;
+        const totalViolencia = violenciaData.reduce((acc, item) => acc + item.valor, 0);
+        const violenciaContainer = document.getElementById('progress-violencia-container');
+        violenciaContainer.innerHTML = '';
+        
+        const violenciaColorMap = {
+          'fisica': '#e63946',
+          'psicologica': '#f4a261',
+          'patrimonial': '#e76f51',
+          'sexual': '#d90429',
+          'moral': '#457b9d',
+          'cibernetica': '#2a9d8f',
+          'institucional': '#6a0572'
+        };
+
+        const violenciaLabels = {
+          'fisica': 'Física',
+          'psicologica': 'Psicológica',
+          'patrimonial': 'Patrimonial',
+          'sexual': 'Sexual',
+          'moral': 'Moral',
+          'cibernetica': 'Cibernética',
+          'institucional': 'Institucional'
+        };
+
+        violenciaData.forEach((item) => {
+          const pct = totalViolencia > 0 ? Math.round((item.valor / totalViolencia) * 100) : 0;
+          const label = violenciaLabels[item.chave.toLowerCase()] || (item.chave.charAt(0).toUpperCase() + item.chave.slice(1));
+          const color = violenciaColorMap[item.chave.toLowerCase()] || '#457b9d';
+
+          violenciaContainer.innerHTML += `
+            <div class="progress-item">
+              <div class="progress-header">
+                <span>${label}</span>
+                <span>${item.valor} (${pct}%)</span>
+              </div>
+              <div class="progress-track">
+                <div class="progress-fill" style="width: ${pct}%; background-color: ${color};"></div>
+              </div>
+            </div>
+          `;
+        });
+
+        const statusData = data.distribuicoes.status;
+        const totalStatus = statusData.reduce((acc, item) => acc + item.valor, 0);
+        const statusContainer = document.getElementById('progress-status-container');
+        statusContainer.innerHTML = '';
+        const statusColorMap = {
+          'Recebida': '#c92a2a',
+          'Em análise': '#e67700',
+          'Concluída': '#2b8a3e'
+        };
+
+        statusData.forEach(item => {
+          const pct = totalStatus > 0 ? Math.round((item.valor / totalStatus) * 100) : 0;
+          const color = statusColorMap[item.chave] || '#457b9d';
+
+          statusContainer.innerHTML += `
+            <div class="progress-item">
+              <div class="progress-header">
+                <span>${item.chave}</span>
+                <span>${item.valor} (${pct}%)</span>
+              </div>
+              <div class="progress-track">
+                <div class="progress-fill" style="width: ${pct}%; background-color: ${color};"></div>
+              </div>
+            </div>
+          `;
+        });
+
+      } catch (err) {
+        console.error('Erro ao carregar dados de progresso:', err);
+      }
+    }
+  </script>
+</body>
+</html>

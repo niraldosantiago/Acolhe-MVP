@@ -1,0 +1,9 @@
+{
+  "name": "acolhe",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Plataforma de acolhimento e gestão segura de denúncias",
+  "main": "server.js",
+  "scripts": { "start": "node server.js", "check": "node --check server.js && node --check public/script.js" },
+  "engines": { "node": ">=22.5.0" }
+}
