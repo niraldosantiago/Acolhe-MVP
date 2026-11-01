@@ -12,6 +12,13 @@
   <!-- Custom CSS -->
   <link rel="stylesheet" href="./style.css" />
   <link rel="stylesheet" href="./style-overrides.css" />
+  <style>
+    .password-input-wrap { position: relative; }
+    .password-input-wrap .custom-input { padding-right: 46px; }
+    .password-visibility-toggle { position:absolute; right:10px; top:50%; transform:translateY(-50%); z-index:2; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; padding:0; border:0; border-radius:5px; background:transparent; color:#60656f; cursor:pointer; }
+    .password-visibility-toggle:hover { background:rgba(0,0,0,.06); }
+    .password-visibility-toggle:focus-visible { outline:2px solid #e91e63; outline-offset:2px; }
+  </style>
 </head>
 <body class="light-theme">
 
@@ -303,7 +310,7 @@
         <div id="identified-fields" class="identified-fields" style="display: none;">
           <div class="form-group">
             <label for="user-name">Nome Completo *</label>
-            <div class="input-icon-wrapper">
+            <div class="input-icon-wrapper password-input-wrap">
               <i class="fa-solid fa-user"></i>
               <input type="text" id="user-name" placeholder="Digite seu nome completo" class="custom-input" />
             </div>
@@ -312,7 +319,7 @@
           <div class="form-row">
             <div class="form-group flex-1">
               <label for="user-phone">Telefone / WhatsApp *</label>
-              <div class="input-icon-wrapper">
+              <div class="input-icon-wrapper password-input-wrap">
                 <i class="fa-solid fa-phone"></i>
                 <input type="tel" id="user-phone" placeholder="(00) 00000-0000" class="custom-input" />
               </div>
@@ -320,7 +327,7 @@
 
             <div class="form-group flex-1">
               <label for="user-email">E-mail</label>
-              <div class="input-icon-wrapper">
+              <div class="input-icon-wrapper password-input-wrap">
                 <i class="fa-solid fa-envelope"></i>
                 <input type="email" id="user-email" placeholder="seuemail@exemplo.com" class="custom-input" />
               </div>
@@ -692,7 +699,10 @@
             <label for="auth-login-password">Senha de Acesso</label>
             <div class="input-icon-wrapper">
               <i class="fa-solid fa-key"></i>
-              <input type="password" id="auth-login-password" required class="custom-input" placeholder="••••••••" />
+              <input type="password" id="auth-login-password" required class="custom-input" placeholder="••••••••"  autocomplete="current-password" />
+              <button type="button" class="password-visibility-toggle" aria-label="Mostrar senha" aria-pressed="false" title="Mostrar senha" onclick="togglePasswordVisibility('auth-login-password', this)">
+                <i class="fa-solid fa-eye" aria-hidden="true"></i>
+              </button>
             </div>
           </div>
           <button type="submit" class="btn-primary-large flex-1">
@@ -731,16 +741,22 @@
               <label for="auth-reg-password">Crie uma Senha *</label>
               <div class="input-icon-wrapper">
                 <i class="fa-solid fa-lock"></i>
-                <input type="password" id="auth-reg-password" required minlength="6" class="custom-input" placeholder="Mínimo 6 caracteres" />
-              </div>
+                <input type="password" id="auth-reg-password" required minlength="6" class="custom-input" placeholder="Mínimo 6 caracteres"  autocomplete="new-password" />
+              <button type="button" class="password-visibility-toggle" aria-label="Mostrar senha" aria-pressed="false" title="Mostrar senha" onclick="togglePasswordVisibility('auth-reg-password', this)">
+                <i class="fa-solid fa-eye" aria-hidden="true"></i>
+              </button>
+            </div>
             </div>
 
             <div class="form-group flex-1">
               <label for="auth-reg-confirm">Confirme a Senha *</label>
               <div class="input-icon-wrapper">
                 <i class="fa-solid fa-shield-check"></i>
-                <input type="password" id="auth-reg-confirm" required minlength="6" class="custom-input" placeholder="Repita a senha" />
-              </div>
+                <input type="password" id="auth-reg-confirm" required minlength="6" class="custom-input" placeholder="Repita a senha"  autocomplete="new-password" />
+              <button type="button" class="password-visibility-toggle" aria-label="Mostrar senha" aria-pressed="false" title="Mostrar senha" onclick="togglePasswordVisibility('auth-reg-confirm', this)">
+                <i class="fa-solid fa-eye" aria-hidden="true"></i>
+              </button>
+            </div>
             </div>
           </div>
 
@@ -753,6 +769,21 @@
     </div>
   </div>
 
+  <script>
+    function togglePasswordVisibility(inputId, button) {
+      const input = document.getElementById(inputId);
+      if (!input || !button) return;
+      const showing = input.type === 'password';
+      input.type = showing ? 'text' : 'password';
+      const label = showing ? 'Ocultar senha' : 'Mostrar senha';
+      button.setAttribute('aria-label', label);
+      button.setAttribute('title', label);
+      button.setAttribute('aria-pressed', String(showing));
+      button.innerHTML = showing
+        ? '<i class="fa-solid fa-eye-slash" aria-hidden="true"></i>'
+        : '<i class="fa-solid fa-eye" aria-hidden="true"></i>';
+    }
+  </script>
   <!-- MapLibre GL JS local -->
   <script src="./vendor/maplibre/maplibre-gl.js"></script>
   <!-- Custom JS -->

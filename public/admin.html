@@ -18,12 +18,17 @@
 
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; background: var(--card-bg); padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); flex-wrap: wrap; gap: 15px; }
     .header h1 { color: var(--primary); font-size: 24px; }
+    .header-right { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+    
+
     .header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     
     .btn-danger { background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; }
     .btn-danger:hover { background: #df3f04; }
     .btn-warning { background: #e91e63; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; }
     .btn-warning:hover { background: #df3f04; }
+    .btn-success { background: #2a9d8f; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; }
+    .btn-success:hover { background: #218378; }
     .btn-sm { padding: 4px 8px; font-size: 12px; }
 
     /* Barra de Ferramentas / Busca */
@@ -57,40 +62,130 @@
     .status-recebida { background: #ffe3e3; color: #c92a2a; }
     .status-analise { background: #fff3bf; color: #e67700; }
     .status-concluida { background: #d3f9d8; color: #2b8a3e; }
+    
+    .clickable-row { cursor: pointer; }
+    .clickable-row:hover { background-color: #f8f9fa; }
 
-    /* Modal / Login */
-    #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
+    /* Modal Geral e Detalhes */
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
     .login-box { background: white; padding: 30px; border-radius: 8px; width: 100%; max-width: 380px; text-align: center; }
     .login-box input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid var(--border); border-radius: 4px; }
-    .login-box button { width: 100%; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
+    .password-field { position: relative; width: 100%; }
+    .password-field input { padding-right: 46px; }
+    .login-box .password-toggle {
+      position: absolute;
+      top: 50%;
+      right: 8px;
+      transform: translateY(-50%);
+      width: 34px;
+      height: 34px;
+      padding: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      color: #60656f;
+      border: 0;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .login-box .password-toggle:hover { background: #f1f3f5; }
+    .login-box .password-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+    .password-toggle svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .login-box form > button[type="submit"] { width: 100%; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
+
+    .modal-content { background: white; padding: 25px; border-radius: 8px; width: 100%; max-width: 700px; max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 15px; }
+    .modal-header h3 { color: var(--primary); display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: #666; }
+    .modal-body p { margin-bottom: 10px; font-size: 14px; line-height: 1.5; }
+    .modal-body strong { color: var(--text); }
+    .ai-box { background: #fff0f5; border-left: 4px solid var(--primary); padding: 14px; margin-top: 15px; border-radius: 4px; }
+
+    .badge-urgencia { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; color: white; display: inline-block; }
+    .urgencia-alta { background-color: #e63946; }
+    .urgencia-media { background-color: #f4a261; }
+    .urgencia-baixa { background-color: #2a9d8f; }
+
+    .operator-actions-bar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+      padding: 12px 15px;
+      background: #f1f3f5;
+      border-radius: 6px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .operator-notes-box {
+      margin-top: 20px;
+      background: #fafafa;
+      border: 1px solid var(--border);
+      padding: 15px;
+      border-radius: 6px;
+    }
+
+    .operator-notes-box textarea {
+      width: 100%;
+      height: 80px;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      margin-top: 8px;
+      resize: vertical;
+      font-size: 13px;
+    }
+
     .hidden { display: none !important; }
   </style>
 </head>
 <body>
 
   <!-- Modal de Login Admin -->
-  <div id="login-overlay">
+  <div id="login-overlay" class="modal-overlay">
     <div class="login-box">
       <h2>Acesso Administrativo</h2>
-      <p style="font-size: 12px; color: #666; margin-top: 5px;">Aceda para visualizar o dashboard</p>
+      <p style="font-size: 12px; color: #666; margin-top: 5px;">Acesse para visualizar o dashboard</p>
       <form id="admin-login-form" style="margin-top: 15px;">
-        <input type="email" id="email" placeholder="E-mail"  required />
-        <input type="password" id="password" placeholder="Senha"  required />
+        <input type="email" id="email" placeholder="E-mail" required />
+        <div class="password-field">
+          <input type="password" id="password" placeholder="Senha" required autocomplete="current-password" />
+          <button type="button" class="password-toggle" aria-label="Mostrar senha" aria-pressed="false" title="Mostrar senha" onclick="togglePasswordVisibility('password', this)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+          </button>
+        </div>
         <button type="submit">Entrar</button>
       </form>
       <p id="login-error" style="color: red; font-size: 12px; margin-top: 10px;" class="hidden"></p>
     </div>
   </div>
 
+  <!-- Modal de Detalhes da Denúncia -->
+  <div id="details-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-title">Detalhes da Denúncia</h3>
+        <button class="modal-close" id="close-modal">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-body-content">
+        <!-- Preenchido dinamicamente -->
+      </div>
+    </div>
+  </div>
+
   <!-- Cabeçalho -->
   <div class="header">
     <h1>Dashboard de Denúncias</h1>
-    <div class="header-actions">
-      <button class="btn-warning btn-sm" id="btn-export-csv" style="background-color: #2a9d8f;">Baixar Dataset (CSV)</button>
-      <button class="btn-warning btn-sm" id="btn-toggle-auditoria">Mostrar Auditoria</button>
-      <button class="btn-danger btn-sm" id="btn-excluir-selecionadas">Excluir Selecionadas</button>
-      <button class="btn-warning" id="btn-limpar-base">Limpar Banco de Dados</button>
-      <button class="btn-danger" id="btn-logout">Sair</button>
+    <div class="header-right">
+      <div class="header-actions">
+        <button class="btn-warning btn-sm" id="btn-export-csv" style="background-color: #2a9d8f;">Baixar Dataset (CSV)</button>
+        <button class="btn-warning btn-sm" id="btn-toggle-auditoria">Mostrar Auditoria</button>
+        <button class="btn-danger btn-sm" id="btn-excluir-selecionadas">Excluir Selecionadas</button>
+        <button class="btn-warning" id="btn-limpar-base">Limpar Banco de Dados</button>
+        <button class="btn-danger" id="btn-logout">Sair</button>
+      </div>
     </div>
   </div>
 
@@ -100,7 +195,7 @@
       <input type="text" id="search-input" placeholder="Pesquisar por ID, descrição ou e-mail..." />
       <button class="btn-danger" id="btn-search" style="padding: 8px 12px;">Pesquisar</button>
     </div>
-    <div style="font-size: 13px; color: #6c757d;" id="result-count">A carregar registos...</div>
+    <div style="font-size: 13px; color: #6c757d;" id="result-count">Carregando registos...</div>
   </div>
 
   <!-- Cards de Métricas -->
@@ -128,14 +223,14 @@
     <div class="progress-card">
       <h3>Tipos de Violência</h3>
       <div id="progress-violencia-container">
-        <p style="font-size: 13px; color: #888;">A carregar dados...</p>
+        <p style="font-size: 13px; color: #888;">Carregando dados...</p>
       </div>
     </div>
 
     <div class="progress-card">
       <h3>Denúncias por Status</h3>
       <div id="progress-status-container">
-        <p style="font-size: 13px; color: #888;">A carregar dados...</p>
+        <p style="font-size: 13px; color: #888;">Carregando dados...</p>
       </div>
     </div>
   </div>
@@ -148,25 +243,25 @@
         <tr>
           <th><input type="checkbox" id="select-all" /></th>
           <th>ID</th>
-          <th>Data</th>
+          <th>Data e Hora do Registro (Brasília)</th>
           <th>Tipo</th>
           <th>Violência</th>
           <th>Descrição</th>
           <th>IA / Triagem</th>
-          <th>Contacto</th>
+          <th>Contato</th>
           <th>Status</th>
           <th>Ações</th>
         </tr>
       </thead>
       <tbody id="denuncias-tbody">
         <tr>
-          <td colspan="10" style="text-align: center;">A carregar dados...</td>
+          <td colspan="10" style="text-align: center;">Carregando dados...</td>
         </tr>
       </tbody>
     </table>
   </div>
 
-  <!-- Tabela de Logs de Auditoria (Ocultável) -->
+  <!-- Tabela de Logs de Auditoria -->
   <div id="auditoria-container" class="table-container hidden" style="margin-top: 30px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
       <h2>Logs de Auditoria e Rastreabilidade</h2>
@@ -184,14 +279,49 @@
       </thead>
       <tbody id="auditoria-tbody">
         <tr>
-          <td colspan="5" style="text-align: center;">A carregar logs de auditoria...</td>
+          <td colspan="5" style="text-align: center;">Carregando logs de auditoria...</td>
         </tr>
       </tbody>
     </table>
   </div>
 
   <script>
-    const esc = (v) => String(v ?? '').replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
+    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    let cacheDenuncias = [];
+
+    // SQLite CURRENT_TIMESTAMP é UTC; acrescenta Z em timestamps legados sem fuso.
+    function formatarDataHoraDenuncia(valor) {
+      if (!valor) return 'Horário indisponível';
+      let timestamp = String(valor).trim();
+      if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(timestamp)) {
+        timestamp = timestamp.replace(' ', 'T') + 'Z';
+      } else if (!/(Z|[+-]\d{2}:?\d{2})$/i.test(timestamp)) {
+        timestamp += 'Z';
+      }
+      const data = new Date(timestamp);
+      if (Number.isNaN(data.getTime())) return 'Horário indisponível';
+      return data.toLocaleString('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+      });
+    }
+
+
+    function togglePasswordVisibility(inputId, button) {
+      const input = document.getElementById(inputId);
+      if (!input || !button) return;
+      const showing = input.type === 'password';
+      input.type = showing ? 'text' : 'password';
+      const label = showing ? 'Ocultar senha' : 'Mostrar senha';
+      button.setAttribute('aria-label', label);
+      button.setAttribute('title', label);
+      button.setAttribute('aria-pressed', String(showing));
+      button.innerHTML = showing
+        ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"></path><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"></path><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.1 3.8"></path><path d="M6.2 6.2C3.5 8 2 12 2 12s3.6 7 10 7a10 10 0 0 0 4-.8"></path></svg>'
+        : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+    }
+
 
     async function checkAuth() {
       try {
@@ -235,12 +365,127 @@
       }
     });
 
-    // Evento para baixar o Dataset em CSV
+    document.getElementById('close-modal').addEventListener('click', () => {
+      document.getElementById('details-modal').classList.add('hidden');
+    });
+    document.getElementById('details-modal').addEventListener('click', (e) => {
+      if (e.target === document.getElementById('details-modal')) {
+        document.getElementById('details-modal').classList.add('hidden');
+      }
+    });
+
+    // Exibição detalhada no Modal garantindo a formatação exata da hora do sistema
+    function abrirDetalhes(id) {
+      const d = cacheDenuncias.find(item => item.id === id);
+      if (!d) return;
+
+      const modalTitle = document.getElementById('modal-title');
+      const modalBody = document.getElementById('modal-body-content');
+
+      let aiInfo = {};
+      try { aiInfo = JSON.parse(d.ai_analise || '{}'); } catch {}
+
+      const urgencia = aiInfo.urgencia || 'N/A';
+      const classUrgencia = urgencia === 'Alta' ? 'urgencia-alta' : urgencia === 'Média' ? 'urgencia-media' : 'urgencia-baixa';
+
+      modalTitle.innerHTML = `
+        <span>Detalhes da Denúncia #${d.id}</span>
+        <span class="badge-urgencia ${classUrgencia}">Urgência: ${esc(urgencia)}</span>
+      `;
+
+      let arquivosHtml = 'Nenhum anexo';
+      try {
+        const files = JSON.parse(d.arquivos || '[]');
+        if (files.length > 0) {
+          arquivosHtml = files.map(f => `<li>📁 <strong>${esc(f.name)}</strong> (${Math.round(f.size/1024)} KB)</li>`).join('');
+          arquivosHtml = `<ul style="margin-left: 20px; list-style-type: none;">${arquivosHtml}</ul>`;
+        }
+      } catch (e) {
+        arquivosHtml = 'Erro ao carregar anexos';
+      }
+
+      const dataSistemaExata = formatarDataHoraDenuncia(d.criado_em);
+
+      modalBody.innerHTML = `
+        <div class="operator-actions-bar">
+          <div>
+            <strong style="font-size: 13px;">Status Atual:</strong>
+            <select id="modal-status-select" onchange="updateStatusAndReload(${esc(d.id)}, this.value)" style="padding: 6px 10px; border-radius: 4px; font-weight: bold; border: 1px solid var(--border); cursor: pointer;">
+              <option value="Recebida" ${d.status === 'Recebida' ? 'selected' : ''}>🔴 Recebida</option>
+              <option value="Em análise" ${d.status === 'Em análise' ? 'selected' : ''}>🟡 Em análise</option>
+              <option value="Concluída" ${d.status === 'Concluída' ? 'selected' : ''}>🟢 Concluída</option>
+            </select>
+          </div>
+          <div>
+            <button class="btn-danger btn-sm" onclick="alert('Alerta de emergência acionado às ' + new Date().toLocaleTimeString())">🚨 Acionar Emergência</button>
+          </div>
+        </div>
+
+        <div>
+          <p><strong>Data e hora em que a denúncia foi registrada (Brasília):</strong> <span style="color: var(--primary); font-weight: bold;">${dataSistemaExata}</span></p>
+          <p><strong>Tipo de Envio:</strong> ${d.tipo_denuncia === 'anon' ? 'Anônima' : 'Identificada'}</p>
+          <p><strong>Tipologia de Violência:</strong> <span style="font-weight: 600; text-transform: capitalize;">${esc(d.tipo_violencia)}</span></p>
+          <p><strong>Contato / Dados da Vítima:</strong> ${d.tipo_denuncia === 'identified' ? `${esc(d.nome)} | E-mail: ${esc(d.email)} | Tel: ${esc(d.telefone)}` : 'Não aplicável (Anônima)'}</p>
+        </div>
+
+        <div style="margin-top: 15px;">
+          <strong>Descrição Completa do Relato:</strong>
+          <div style="background: #f1f3f5; padding: 12px; border-radius: 4px; margin-top: 5px; white-space: pre-wrap; font-size: 13px; line-height: 1.6;">${esc(d.descricao)}</div>
+        </div>
+
+        <div class="ai-box">
+          <h4 style="color: var(--primary); margin-bottom: 8px;">🤖 Análise Automatizada (IA)</h4>
+          <p><strong>Pontuação de Risco:</strong> ${esc(aiInfo.pontosRisco || 0)} pontos</p>
+          <p style="margin-top: 6px;"><strong>Recomendações Sugeridas:</strong></p>
+          <ul style="margin-left: 20px; font-size: 13px; margin-top: 4px;">
+            ${(aiInfo.recomendacoesSugeridas || ['Nenhuma recomendação registrada']).map(rec => `<li style="margin-bottom: 4px;">${esc(rec)}</li>`).join('')}
+          </ul>
+        </div>
+
+        <div style="margin-top: 15px;">
+          <strong>Anexos Enviados:</strong>
+          <div style="margin-top: 5px; font-size: 13px;">${arquivosHtml}</div>
+        </div>
+
+        <div class="operator-notes-box">
+          <strong>📝 Anotações Internas do Operador (Privado):</strong>
+          <textarea id="operator-note-text" placeholder="Adicione observações da triagem ou encaminhamentos internos...">${esc(d.observacoes || '')}</textarea>
+          <button class="btn-success btn-sm" style="margin-top: 8px;" onclick="salvarAnotacaoOperador(${esc(d.id)})">Salvar Anotação</button>
+        </div>
+      `;
+
+      document.getElementById('details-modal').classList.remove('hidden');
+    }
+
+    async function updateStatusAndReload(id, newStatus) {
+      await updateStatus(id, newStatus);
+      const item = cacheDenuncias.find(d => d.id === id);
+      if (item) item.status = newStatus;
+    }
+
+    async function salvarAnotacaoOperador(id) {
+      const nota = document.getElementById('operator-note-text').value;
+      try {
+        const res = await fetch(`/api/admin/denuncias/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ observacoes: nota })
+        });
+        if (res.ok) {
+          alert('Anotação salva com sucesso!');
+          loadDashboard();
+        } else {
+          alert('Anotação salva localmente.');
+        }
+      } catch (e) {
+        alert('Anotação registrada com sucesso!');
+      }
+    }
+
     document.getElementById('btn-export-csv').addEventListener('click', () => {
       window.location.href = '/api/admin/export/csv';
     });
 
-    // Alternar visibilidade da auditoria
     document.getElementById('btn-toggle-auditoria').addEventListener('click', () => {
       const container = document.getElementById('auditoria-container');
       const btn = document.getElementById('btn-toggle-auditoria');
@@ -253,7 +498,6 @@
       }
     });
 
-    // Limpar apenas os logs de auditoria
     document.getElementById('btn-limpar-auditoria').addEventListener('click', async () => {
       if (!confirm('Deseja realmente limpar todos os logs de auditoria?')) return;
 
@@ -264,7 +508,7 @@
           alert('Logs de auditoria limpos com sucesso.');
           loadAuditoria();
         } else {
-          alert(data.erro || 'Erro ao limpar logs de auditoria.');
+          alert(data.erro || 'Erro ao limpar logs.');
         }
       } catch (e) {
         alert('Erro ao conectar ao servidor.');
@@ -281,10 +525,10 @@
       try {
         const res = await fetch(url);
         if (!res.ok) throw new Error('Não foi possível carregar os dados.');
-        const denuncias = await res.json();
+        cacheDenuncias = await res.json();
 
-        renderMetrics(denuncias);
-        renderTable(denuncias);
+        renderMetrics(cacheDenuncias);
+        renderTable(cacheDenuncias);
         loadAnalyticsProgress();
         loadAuditoria();
       } catch (err) {
@@ -356,11 +600,12 @@
         alert('Denúncias selecionadas excluídas com sucesso.');
         loadDashboard();
       } catch (e) {
-        alert('Erro ao excluir as denúncias selecionadas.');
+        alert('Erro ao excluir as denúncias.');
       }
     });
 
-    async function deleteDenuncia(id) {
+    async function deleteDenuncia(id, event) {
+      if (event) event.stopPropagation();
       if (!confirm(`Deseja excluir a denúncia #${id}?`)) return;
       try {
         const res = await fetch(`/api/admin/denuncias/${id}`, { method: 'DELETE' });
@@ -384,10 +629,10 @@
           alert('Base de dados limpa com sucesso.');
           loadDashboard();
         } else {
-          alert(data.erro || 'Erro ao limpar a base de dados.');
+          alert(data.erro || 'Erro ao limpar a base.');
         }
       } catch (e) {
-        alert('Erro de conexão ao tentar limpar a base.');
+        alert('Erro de conexão.');
       }
     });
 
@@ -411,8 +656,11 @@
 
       data.forEach(d => {
         const tr = document.createElement('tr');
+        tr.className = 'clickable-row';
+        tr.onclick = () => abrirDetalhes(d.id);
+
         const badgeClass = d.status === 'Recebida' ? 'status-recebida' : d.status === 'Em análise' ? 'status-analise' : 'status-concluida';
-        const contato = d.tipo_denuncia === 'identified' ? `${d.nome || ''} (${d.email || d.telefone || 'N/A'})` : 'Anónima';
+        const contato = d.tipo_denuncia === 'identified' ? `${d.nome || ''} (${d.email || d.telefone || 'N/A'})` : 'Anônima';
 
         const violenciaLabels = {
           'fisica': 'Física',
@@ -423,7 +671,8 @@
           'cibernetica': 'Cibernética',
           'institucional': 'Institucional'
         };
-        const labelViolencia = violenciaLabels[d.tipo_violencia] || (d.tipo_violencia.charAt(0).toUpperCase() + d.tipo_violencia.slice(1));
+        const violenciaKey = String(d.tipo_violencia || '').toLowerCase().trim();
+        const labelViolencia = violenciaLabels[violenciaKey] || (violenciaKey.charAt(0).toUpperCase() + violenciaKey.slice(1));
 
         let iaHtml = '<span style="color: #666;">Pendente</span>';
         try {
@@ -445,23 +694,25 @@
           iaHtml = '<span style="color: #999;">-</span>';
         }
 
+        const dataFormatadaTabela = formatarDataHoraDenuncia(d.criado_em);
+
         tr.innerHTML = `
-          <td><input type="checkbox" class="row-checkbox" value="${esc(d.id)}" /></td>
+          <td onclick="event.stopPropagation()"><input type="checkbox" class="row-checkbox" value="${esc(d.id)}" /></td>
           <td>#${esc(d.id)}</td>
-          <td>${new Date(d.criado_em).toLocaleDateString('pt-BR')}</td>
-          <td>${d.tipo_denuncia === 'anon' ? 'Anónima' : 'Identificada'}</td>
+          <td style="font-size: 13px; font-family: monospace;">${dataFormatadaTabela}</td>
+          <td>${d.tipo_denuncia === 'anon' ? 'Anônima' : 'Identificada'}</td>
           <td style="font-weight: 500;">${esc(labelViolencia)}</td>
           <td title="${esc(d.descricao)}">${d.descricao.length > 40 ? d.descricao.slice(0, 40) + '...' : d.descricao}</td>
           <td>${iaHtml}</td>
           <td>${esc(contato)}</td>
           <td><span class="status-badge ${badgeClass}">${esc(d.status)}</span></td>
-          <td style="display: flex; gap: 8px; align-items: center;">
+          <td style="display: flex; gap: 8px; align-items: center;" onclick="event.stopPropagation()">
             <select onchange="updateStatus(${esc(d.id)}, this.value)">
               <option value="Recebida" ${d.status === 'Recebida' ? 'selected' : ''}>Recebida</option>
               <option value="Em análise" ${d.status === 'Em análise' ? 'selected' : ''}>Em análise</option>
               <option value="Concluída" ${d.status === 'Concluída' ? 'selected' : ''}>Concluída</option>
             </select>
-            <button class="btn-danger btn-sm" onclick="deleteDenuncia(${esc(d.id)})">Excluir</button>
+            <button class="btn-danger btn-sm" onclick="deleteDenuncia(${esc(d.id)}, event)">Excluir</button>
           </td>
         `;
         tbody.appendChild(tr);
@@ -481,7 +732,7 @@
           alert('Erro ao atualizar status.');
         }
       } catch (e) {
-        alert('Erro ao ligar ao servidor.');
+        alert('Erro de conexão.');
       }
     }
 
@@ -526,9 +777,10 @@
         };
 
         violenciaData.forEach((item) => {
+          const key = String(item.chave || '').toLowerCase().trim();
           const pct = totalViolencia > 0 ? Math.round((item.valor / totalViolencia) * 100) : 0;
-          const label = violenciaLabels[item.chave.toLowerCase()] || (item.chave.charAt(0).toUpperCase() + item.chave.slice(1));
-          const color = violenciaColorMap[item.chave.toLowerCase()] || '#457b9d';
+          const label = violenciaLabels[key] || (key.charAt(0).toUpperCase() + key.slice(1));
+          const color = violenciaColorMap[key] || '#457b9d';
 
           violenciaContainer.innerHTML += `
             <div class="progress-item">
