@@ -14,7 +14,11 @@ const DATA = path.resolve(process.env.ACOLHE_DATA_DIR || path.join(ROOT, 'data')
 const UPLOADS = path.join(DATA, 'uploads');
 const PORT = Number(process.env.PORT || 3000);
 const IS_PROD = process.env.NODE_ENV === 'production';
-const MAX_BODY = 16 * 1024 * 1024;
+const MAX_BODY = 15 * 1024 * 1024;
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_FILES = 5;
+const MAX_TOTAL_FILE_SIZE = 10 * 1024 * 1024;
+const CSP_ENFORCE = process.env.ACOLHE_CSP_ENFORCE === 'true';
 const ADMIN_EMAIL = String(process.env.ACOLHE_ADMIN_EMAIL || '').trim().toLowerCase();
 const ADMIN_PASSWORD = process.env.ACOLHE_ADMIN_PASSWORD || '';
 if (IS_PROD && (!ADMIN_EMAIL || ADMIN_PASSWORD.length < 12)) {
@@ -46,12 +50,60 @@ function audit(actor, reportId, action, details={}) { q('INSERT INTO audit(actor
 function admin(req,res) { const u=adminFor(req); if(!u){send(res,401,{erro:'Autenticação administrativa necessária.'});return null;} return u; }
 function rateLimit(req,res,max=10) { const ip=String(req.socket.remoteAddress||'unknown'); const now=Date.now(); for(const [k,v] of limits) if(v.until<now) limits.delete(k); const x=limits.get(ip)||{n:0,until:now+60000}; x.n++; limits.set(ip,x); if(x.n>max){send(res,429,{erro:'Muitas requisições. Tente novamente mais tarde.'});return false;} return true; }
 const limits=new Map();
-async function body(req) { const chunks=[];let size=0;for await(const c of req){size+=c.length;if(size>MAX_BODY)throw Object.assign(Error('Requisição excede o limite.'),{status:413});chunks.push(c);}try{return JSON.parse(Buffer.concat(chunks).toString()||'{}');}catch{throw Object.assign(Error('JSON inválido.'),{status:400});} }
+async function body(req) {
+  const contentLength=Number(req.headers['content-length']||0);
+  if(contentLength>MAX_BODY) throw Object.assign(Error('Requisição excede o limite.'),{status:413});
+  const chunks=[];let size=0;
+  for await(const c of req){size+=c.length;if(size>MAX_BODY)throw Object.assign(Error('Requisição excede o limite.'),{status:413});chunks.push(c);}
+  try{return JSON.parse(Buffer.concat(chunks).toString('utf8')||'{}');}
+  catch{throw Object.assign(Error('JSON inválido.'),{status:400});}
+}
 function checkOrigin(req) { const origin=req.headers.origin; if(!origin)return true; try{return new URL(origin).host===req.headers.host;}catch{return false;} }
 const allowedViolence=new Set(['fisica','psicologica','patrimonial','sexual','moral','cibernetica','institucional']);
-const allowedMime=new Set(['image/jpeg','image/png','application/pdf','audio/mpeg','audio/wav']);
+const MIME_TO_EXT = new Map([
+  ['image/jpeg', 'jpg'],
+  ['image/png', 'png'],
+  ['application/pdf', 'pdf'],
+  ['audio/mpeg', 'mp3'],
+  ['audio/wav', 'wav']
+]);
 function safeName(n){return path.basename(String(n||'arquivo')).replace(/[^a-zA-Z0-9._-]/g,'_').slice(0,100)||'arquivo';}
-async function saveFiles(files,id){if(!Array.isArray(files))throw Object.assign(Error('Lista de anexos inválida.'),{status:400});const saved=[];try{for(const f of files){if(!f||!allowedMime.has(f.type)||typeof f.data!=='string'||!Number.isInteger(f.size)||f.size<1||f.size>10*1024*1024)throw Object.assign(Error('Anexo inválido.'),{status:400});const match=f.data.match(/^data:([\w.+-]+\/[\w.+-]+);base64,([A-Za-z0-9+/=]+)$/);if(!match||match[1]!==f.type)throw Object.assign(Error('Conteúdo de anexo inválido.'),{status:400});const buf=Buffer.from(match[2],'base64');if(buf.length!==f.size)throw Object.assign(Error('Tamanho do anexo inválido.'),{status:400});const filename=`${id}-${crypto.randomUUID()}-${safeName(f.name)}`;await fsp.writeFile(path.join(UPLOADS,filename),buf,{mode:0o600,flag:'wx'});saved.push({name:safeName(f.name),type:f.type,size:buf.length,file:filename});}return saved;}catch(e){await Promise.all(saved.map(x=>fsp.unlink(path.join(UPLOADS,x.file)).catch(()=>{})));throw e;}}
+function badFile(message){return Object.assign(new Error(message),{status:400});}
+function detectMime(buf){
+  if(buf.length>=8 && buf.subarray(0,8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]))) return 'image/png';
+  if(buf.length>=3 && buf[0]===0xff && buf[1]===0xd8 && buf[2]===0xff) return 'image/jpeg';
+  if(buf.length>=5 && buf.subarray(0,5).toString('ascii')==='%PDF-') return 'application/pdf';
+  if(buf.length>=12 && buf.subarray(0,4).toString('ascii')==='RIFF' && buf.subarray(8,12).toString('ascii')==='WAVE') return 'audio/wav';
+  if(buf.length>=3 && buf.subarray(0,3).toString('ascii')==='ID3') return 'audio/mpeg';
+  if(buf.length>=2 && buf[0]===0xff && (buf[1]&0xe0)===0xe0) return 'audio/mpeg';
+  return null;
+}
+async function saveFiles(files,id){
+  if(!Array.isArray(files)) throw badFile('Lista de anexos inválida.');
+  if(files.length>MAX_FILES) throw badFile(`Máximo de ${MAX_FILES} arquivos por denúncia.`);
+  const total=files.reduce((sum,f)=>sum+(Number.isSafeInteger(f?.size)?f.size:0),0);
+  if(total>MAX_TOTAL_FILE_SIZE) throw badFile('O total dos anexos excede 10 MB.');
+  const saved=[];
+  try{
+    for(const f of files){
+      if(!f || typeof f.data!=='string' || !Number.isSafeInteger(f.size) || f.size<1 || f.size>MAX_FILE_SIZE || typeof f.type!=='string') throw badFile('Anexo inválido.');
+      const match=f.data.match(/^data:([\w.+-]+\/[\w.+-]+);base64,([A-Za-z0-9+/]+={0,2})$/);
+      if(!match || match[1].toLowerCase()!==f.type.toLowerCase()) throw badFile('Conteúdo Base64 ou tipo declarado inválido.');
+      const b64=match[2];
+      const buf=Buffer.from(b64,'base64');
+      if(buf.toString('base64')!==b64 || buf.length!==f.size) throw badFile('Tamanho ou codificação do anexo inválido.');
+      const actualMime=detectMime(buf);
+      if(!actualMime || actualMime!==f.type.toLowerCase() || !MIME_TO_EXT.has(actualMime)) throw badFile('O conteúdo real do arquivo não corresponde a um tipo permitido.');
+      const filename=`${id}-${crypto.randomUUID()}.${MIME_TO_EXT.get(actualMime)}`;
+      await fsp.writeFile(path.join(UPLOADS,filename),buf,{mode:0o600,flag:'wx'});
+      saved.push({name:safeName(f.name),type:actualMime,size:buf.length,file:filename});
+    }
+    return saved;
+  }catch(e){
+    await Promise.all(saved.map(x=>fsp.unlink(path.join(UPLOADS,x.file)).catch(()=>{})));
+    throw e;
+  }
+}
 
 // =====================================================================
 // FUNÇÃO DE TRIAGEM AVANÇADA, ROBUSTA E COM VOCABULÁRIO AMPLIADO
@@ -147,7 +199,9 @@ function triage(text, type) {
 
 function csvCell(v){let s=String(v??'');if(/^[\s]*[=+\-@\t\r]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';}
 function mime(file){return ({'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.svg':'image/svg+xml','.ico':'image/x-icon'})[path.extname(file).toLowerCase()]||'application/octet-stream';}
-function serve(req,res,pathname){let decoded;try{decoded=decodeURIComponent(pathname);}catch{return send(res,400,{erro:'Caminho inválido.'});}const rel=decoded==='/'?'/index.html':decoded;const root=path.resolve(PUBLIC);const file=path.resolve(root,'.'+rel);if(!file.startsWith(root+path.sep))return send(res,403,{erro:'Acesso negado.'});fs.stat(file,(e,s)=>{if(e||!s.isFile())return send(res,404,{erro:'Ficheiro não encontrado.'});res.writeHead(200,{'Content-Type':mime(file),'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Cache-Control':'no-store','Content-Security-Policy':"default-src 'self' https: data:; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; connect-src 'self' https://tiles.openfreemap.org; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"});if(req.method==='HEAD')return res.end();fs.createReadStream(file).pipe(res);});}
+function serve(req,res,pathname){let decoded;try{decoded=decodeURIComponent(pathname);}catch{return send(res,400,{erro:'Caminho inválido.'});}const rel=decoded==='/'?'/index.html':decoded;const root=path.resolve(PUBLIC);const file=path.resolve(root,'.'+rel);if(!file.startsWith(root+path.sep))return send(res,403,{erro:'Acesso negado.'});fs.stat(file,(e,s)=>{if(e||!s.isFile())return send(res,404,{erro:'Ficheiro não encontrado.'});const csp="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' https://unpkg.com; style-src 'self' https://unpkg.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; font-src 'self' data: https://cdnjs.cloudflare.com; connect-src 'self' https://tiles.openfreemap.org; worker-src 'self' blob:";
+const cspHeader=CSP_ENFORCE?'Content-Security-Policy':'Content-Security-Policy-Report-Only';
+res.writeHead(200,{'Content-Type':mime(file),'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Cache-Control':'no-store',[cspHeader]:csp});if(req.method==='HEAD')return res.end();fs.createReadStream(file).pipe(res);});}
 
 async function route(req,res){const u=new URL(req.url,'http://localhost');const p=u.pathname,m=req.method;const actor=userFor(req);
  if(p.startsWith('/api/')&&!checkOrigin(req)&&['POST','PATCH','DELETE'].includes(m))return send(res,403,{erro:'Origem da requisição não autorizada.'});
@@ -167,7 +221,7 @@ async function route(req,res){const u=new URL(req.url,'http://localhost');const 
    if(type==='identified'&&(!actor||actor.is_admin||!String(actor.name||'').trim()||!String(actor.phone||'').trim()))return send(res,400,{erro:'Complete nome e telefone no cadastro antes de enviar denúncia identificada.'});
    
    const files=Array.isArray(b.arquivos)?b.arquivos:[];
-   if(files.reduce((n,f)=>n+Number(f?.size||0),0)>10*1024*1024)return send(res,400,{erro:'O total de anexos excede 10 MB.'});
+   if(files.length>MAX_FILES||files.some(f=>!Number.isSafeInteger(f?.size)||f.size<1||f.size>MAX_FILE_SIZE)||files.reduce((n,f)=>n+f.size,0)>MAX_TOTAL_FILE_SIZE)return send(res,400,{erro:'Anexos excedem os limites permitidos.'});
    
    const tri=triage(desc,v),name=type==='identified'?(actor.name||String(b.nome||'').slice(0,200)):null,phone=type==='identified'?(actor.phone||String(b.telefone||'').slice(0,40)):null,email=type==='identified'?actor.email:null;
    const r=q('INSERT INTO reports(user_id,report_type,violence_type,description,name,phone,email,triage) VALUES(?,?,?,?,?,?,?,?)').run(type==='identified'?actor.id:null,type,v,desc,name,phone,email,JSON.stringify(tri));
