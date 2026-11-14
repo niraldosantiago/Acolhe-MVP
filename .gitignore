@@ -1,2 +1,7 @@
-﻿data/
-node_modules/
+﻿node_modules/
+playwright-report/
+test-results/
+data/
+evidencias/
+.env
+*.sqlite
