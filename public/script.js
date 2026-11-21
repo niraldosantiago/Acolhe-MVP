@@ -1,3 +1,97 @@
+// --- CONFIGURAÇÃO DE API PARA WEB E ANDROID (EMULADOR / CAPACITOR -> RENDER) ---
+function getApiBaseUrl() {
+  const isCapacitorNative =
+    Boolean(window.Capacitor) &&
+    (typeof window.Capacitor.isNativePlatform === 'function'
+      ? window.Capacitor.isNativePlatform()
+      : window.Capacitor.getPlatform?.() !== 'web');
+
+  // No emulador Android / app nativo, aponta para o servidor online no Render
+  if (isCapacitorNative) {
+    return 'https://acolhe-mvp.onrender.com';
+  }
+
+  return '';
+}
+
+function apiUrl(path) {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${getApiBaseUrl()}${normalizedPath}`;
+}
+
+async function parseJsonOrThrow(response) {
+  const rawText = await response.text();
+  const contentType = response.headers.get('content-type') || '';
+
+  let parsed = null;
+  if (rawText) {
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      const snippet = rawText.replace(/\s+/g, ' ').trim().slice(0, 140);
+      throw new Error(
+        `Resposta não-JSON (HTTP ${response.status}${contentType ? `, ${contentType}` : ''}): ${snippet}`
+      );
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(parsed?.erro || parsed?.message || `Erro HTTP ${response.status}`);
+  }
+
+  return parsed ?? {};
+}
+
+// --- ADAPTAÇÃO RESPONSIVA SEM ALTERAR ESTRUTURA, ÍCONES OU ESTILOS BASE ---
+function syncResponsiveViewport() {
+  const width = window.innerWidth || document.documentElement.clientWidth || 390;
+  const height = window.innerHeight || document.documentElement.clientHeight || 844;
+  const isCapacitorNative =
+    Boolean(window.Capacitor) &&
+    (typeof window.Capacitor.isNativePlatform === 'function'
+      ? window.Capacitor.isNativePlatform()
+      : window.Capacitor.getPlatform?.() !== 'web');
+
+  document.documentElement.style.setProperty('--app-vw', `${width}px`);
+  document.documentElement.style.setProperty('--app-vh', `${height * 0.01}px`);
+
+  document.body.classList.toggle('is-mobile-view', width <= 768);
+  document.body.classList.toggle('is-tablet-view', width > 768 && width <= 1024);
+  document.body.classList.toggle('is-desktop-view', width > 1024);
+  document.body.classList.toggle('is-native-app', Boolean(isCapacitorNative));
+
+  const mapContainer = document.getElementById('map-container');
+  if (mapContainer) {
+    if (width <= 480) {
+      mapContainer.style.minHeight = '240px';
+      mapContainer.style.height = `${Math.max(240, Math.min(320, Math.round(height * 0.36)))}px`;
+    } else if (width <= 768) {
+      mapContainer.style.minHeight = '280px';
+      mapContainer.style.height = `${Math.max(280, Math.min(380, Math.round(height * 0.42)))}px`;
+    } else {
+      mapContainer.style.height = '';
+      mapContainer.style.minHeight = '';
+    }
+  }
+
+  const chatMessages = document.getElementById('chat-messages');
+  if (chatMessages && width <= 768) {
+    chatMessages.style.maxHeight = `${Math.max(200, Math.round(height * 0.45))}px`;
+  } else if (chatMessages) {
+    chatMessages.style.maxHeight = '';
+  }
+
+  if (realMap && typeof realMap.resize === 'function') {
+    setTimeout(() => {
+      try {
+        realMap.resize();
+      } catch (e) {
+        // Ignora resize antes do mapa terminar de montar
+      }
+    }, 120);
+  }
+}
+
 // --- DICIONÁRIO MULTI-IDIOMAS ---
 const i18nTranslations = {
   pt: {
@@ -8,7 +102,7 @@ const i18nTranslations = {
     nav_map: "Onde Buscar",
     quick_exit: "SAÍDA RÁPIDA",
     hero_subtitle: "Você não está sozinha.",
-    hero_desc: "Encontre orientação, informações e canais de apoio de forma rápida e segura.",
+    hero_desc: "Encontre orientação, información e canais de apoio de forma rápida e segura.",
     btn_need_help: "PRECISO DE AJUDA AGORA",
     how_can_we_help: "Como podemos ajudar?",
     card_find_help_title: "Encontrar ajuda",
@@ -264,6 +358,8 @@ function navigateTo(targetId) {
 
   document.querySelectorAll(`[data-target="${targetId}"]`).forEach(btn => btn.classList.add('active'));
 
+  syncResponsiveViewport();
+
   if (targetId === 'map') {
     setTimeout(() => {
       initRealMap();
@@ -410,7 +506,7 @@ async function submitForm(e) {
   const tipoDenuncia = form.querySelector('input[name="anon_type"]:checked')?.value;
   const tipoViolencia = form.querySelector('.custom-select')?.value || document.getElementById('tipo-violencia')?.value;
   const descricao = document.getElementById('report-text')?.value.trim();
-  
+
   const nome = document.getElementById('user-name')?.value.trim() || null;
   const telefone = document.getElementById('user-phone')?.value.trim() || null;
   const email = document.getElementById('user-email')?.value.trim() || null;
@@ -424,20 +520,21 @@ async function submitForm(e) {
   // bloquear identificadas sem sessão, pois validação no navegador não é segurança.
   if (tipoDenuncia === 'identified') {
     try {
-      const sessao = await fetch('/api/me', {
+      const sessao = await fetch(apiUrl('/api/me'), {
         method: 'GET',
         credentials: 'include',
         headers: { 'Accept': 'application/json' }
       });
-      const estado = await sessao.json();
-      if (!sessao.ok || !estado.user) {
+      const estado = await parseJsonOrThrow(sessao);
+      if (!estado.user) {
         alert('Faça login para enviar uma denúncia identificada.');
         if (typeof switchAuthTab === 'function') switchAuthTab('login');
-        openModal('auth-modal'); return;
+        openModal('auth-modal');
+        return;
       }
     } catch (erro) {
       console.error('Não foi possível verificar a sessão:', erro);
-      alert('Não foi possível verificar seu login. Tente novamente.');
+      alert(`Não foi possível verificar seu login: ${erro.message}`);
       return;
     }
   }
@@ -471,30 +568,28 @@ async function submitForm(e) {
   };
 
   try {
-    const resposta = await fetch('/api/denuncias', {
+    const resposta = await fetch(apiUrl('/api/denuncias'), {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
       credentials: 'include',
       body: JSON.stringify(payload)
     });
 
-    const dados = await resposta.json();
-
-    if (!resposta.ok) {
-      if (resposta.status === 401) {
-        alert('Deve efetuar login para enviar uma denúncia identificada.');
-        return;
-      }
-      throw new Error(dados.erro || 'Não foi possível cadastrar a denúncia.');
-    }
+    const dados = await parseJsonOrThrow(resposta);
 
     alert(`Denúncia cadastrada com sucesso. Protocolo: ${dados.id}`);
     resetForm();
   } catch (erro) {
     console.error(erro);
-    alert(`Erro ao enviar a denúncia: ${erro.message}`);
+    const msg = String(erro.message || '');
+    if (msg.includes('401') || msg.toLowerCase().includes('login')) {
+      alert('Deve efetuar login para enviar uma denúncia identificada.');
+      return;
+    }
+    alert(`Erro ao enviar a denúncia: ${msg || 'Não foi possível cadastrar a denúncia.'}`);
   }
 }
 
@@ -529,6 +624,7 @@ const sampleLocations = [
 function initRealMap() {
   const mapContainer = document.getElementById('map-container');
   if (!mapContainer) return;
+  syncResponsiveViewport();
   if (!window.maplibregl) {
     showMapMessage('A biblioteca do mapa não carregou. Atualize a página; os locais continuam listados abaixo.');
     renderPlaces(sampleLocations);
@@ -548,7 +644,10 @@ function initRealMap() {
         compact: false,
         customAttribution: '<a href="https://openfreemap.org/" target="_blank" rel="noopener">OpenFreeMap</a> | © <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> | Dados © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
       }), 'bottom-right');
-      realMap.on('load', () => showMapMessage(''));
+      realMap.on('load', () => {
+        showMapMessage('');
+        realMap.resize();
+      });
       realMap.on('error', (event) => {
         console.error('Erro do provedor de mapa:', event.error || event);
         showMapMessage('Não foi possível carregar o mapa real. Verifique a conexão e tente recarregar a página; os locais continuam listados abaixo.');
@@ -632,7 +731,10 @@ function showAllLocations(e) {
 // --- MODAIS E CHAT ---
 function openModal(modalId) {
   const modal = document.getElementById(modalId);
-  if (modal) modal.classList.add('active');
+  if (modal) {
+    modal.classList.add('active');
+    syncResponsiveViewport();
+  }
 }
 
 function closeModal(modalId) {
@@ -686,29 +788,35 @@ document.addEventListener("keydown", function (event) {
 });
 
 // --- INICIALIZAÇÃO DA APLICAÇÃO ---
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => renderPlaces(sampleLocations), { once: true });
-} else {
+function initApp() {
+  syncResponsiveViewport();
   renderPlaces(sampleLocations);
+  refreshProfile();
+}
+
+window.addEventListener('resize', syncResponsiveViewport, { passive: true });
+window.addEventListener('orientationchange', () => setTimeout(syncResponsiveViewport, 120), { passive: true });
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp, { once: true });
+} else {
+  initApp();
 }
 
 document.getElementById('btn-user-logout')?.addEventListener('click', async () => {
   try {
-    const res = await fetch('/api/logout', { 
+    const res = await fetch(apiUrl('/api/logout'), {
       method: 'POST',
-      credentials: 'include' // Garante que o cookie 'sid' é limpo no servidor
+      credentials: 'include',
+      headers: { 'Accept': 'application/json' }
     });
 
-    if (res.ok) {
-      alert('Sessão encerrada com sucesso.');
-      // Redireciona para a página inicial ou limpa os dados da interface
-      window.location.href = '/index.html'; 
-    } else {
-      alert('Erro ao terminar sessão.');
-    }
+    await parseJsonOrThrow(res);
+    alert('Sessão encerrada com sucesso.');
+    window.location.href = 'index.html';
   } catch (e) {
     console.error('Erro de conexão:', e);
-    alert('Erro ao ligar ao servidor.');
+    alert(e.message || 'Erro ao ligar ao servidor.');
   }
 });
 
@@ -718,31 +826,50 @@ async function handleAuthSubmit(event, mode) {
   const isRegister = mode === 'register';
   const email = document.getElementById(isRegister ? 'auth-reg-email' : 'auth-login-email')?.value.trim();
   const password = document.getElementById(isRegister ? 'auth-reg-password' : 'auth-login-password')?.value;
-  if (isRegister && password !== document.getElementById('auth-reg-confirm')?.value) { alert('As senhas não coincidem.'); return; }
+  if (isRegister && password !== document.getElementById('auth-reg-confirm')?.value) {
+    alert('As senhas não coincidem.');
+    return;
+  }
   const payload = { email, password };
   if (isRegister) {
     payload.name = document.getElementById('auth-reg-name')?.value.trim();
     payload.phone = document.getElementById('auth-reg-phone')?.value.trim();
-    if (!payload.phone) { alert('Informe um telefone para habilitar denúncia identificada.'); return; }
+    if (!payload.phone) {
+      alert('Informe um telefone para habilitar denúncia identificada.');
+      return;
+    }
   }
   try {
-    const res = await fetch(isRegister ? '/api/register' : '/api/login', { method:'POST', credentials:'include', headers:{'Content-Type':'application/json','Accept':'application/json'}, body:JSON.stringify(payload) });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.erro || 'Não foi possível autenticar.');
-    closeModal('auth-modal'); await refreshProfile(); alert(isRegister ? 'Conta criada e sessão iniciada.' : 'Login realizado.');
-  } catch (err) { alert(err.message || 'Falha de conexão.'); }
+    const res = await fetch(apiUrl(isRegister ? '/api/register' : '/api/login'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    await parseJsonOrThrow(res);
+    closeModal('auth-modal');
+    await refreshProfile();
+    alert(isRegister ? 'Conta criada e sessão iniciada.' : 'Login realizado.');
+  } catch (err) {
+    alert(err.message || 'Falha de conexão.');
+  }
 }
 
 async function refreshProfile() {
   try {
-    const res = await fetch('/api/me', { credentials:'include', headers:{Accept:'application/json'} });
-    const data = await res.json(); const user = data.user;
+    const res = await fetch(apiUrl('/api/me'), {
+      credentials: 'include',
+      headers: { 'Accept': 'application/json' }
+    });
+    const data = await parseJsonOrThrow(res);
+    const user = data.user;
     const name = document.getElementById('profile-display-name');
-    const email = document.getElementById('profile-email'); const phone = document.getElementById('profile-phone');
+    const email = document.getElementById('profile-email');
+    const phone = document.getElementById('profile-phone');
     if (name) name.textContent = user?.name || user?.email || 'Usuária Acolhe';
     if (email) email.textContent = user?.email || 'Não informado (Anônimo)';
     if (phone) phone.textContent = user?.phone || 'Não informado';
-  } catch (e) { console.error('Falha ao atualizar perfil:', e); }
+  } catch (e) {
+    console.error('Falha ao atualizar perfil:', e);
+  }
 }
-
-document.addEventListener('DOMContentLoaded', refreshProfile);

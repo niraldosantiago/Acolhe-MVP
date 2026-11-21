@@ -14,12 +14,12 @@
     "node": ">=22.5.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.6.2",
     "@capacitor/cli": "^8.6.2",
     "@playwright/test": "^1.65.0",
     "supertest": "^7.3.2"
   },
   "dependencies": {
-    "@capacitor/android": "^8.6.2",
     "@capacitor/core": "^8.6.2"
   }
 }
