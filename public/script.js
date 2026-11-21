@@ -1,19 +1,3 @@
-
-const API_BASE_URL = 'https://acolhe-mvp.onrender.com';
-
-// Helper para chamadas à API (facilita web e Capacitor)
-function apiUrl(path) {
-  return `${API_BASE_URL}${path}`;
-}
-
-// Mantém o mapa MapLibre ajustado ao redimensionar tela ou girar o aparelho
-window.addEventListener('resize', () => {
-  const mapSection = document.getElementById('map');
-  if (realMap && mapSection?.classList.contains('active')) {
-    realMap.resize();
-  }
-});
-
 // --- DICIONÁRIO MULTI-IDIOMAS ---
 const i18nTranslations = {
   pt: {

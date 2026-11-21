@@ -1,5 +1,5 @@
 /* ==========================================================================
-1. VARIÁVEIS DE TEMA (LIGHT & DARK MODE)
+   1. VARIÁVEIS DE TEMA (LIGHT & DARK MODE)
    ========================================================================== */
 :root {
   --primary-color: #e63974;
@@ -35,11 +35,9 @@ body.dark-theme {
 }
 
 /* ==========================================================================
-2. RESET E ESTILOS BASE
+   2. RESET E ESTILOS BASE
    ========================================================================== */
-*,
-*::before,
-*::after {
+* {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -50,10 +48,8 @@ body {
   background-color: var(--bg-body);
   color: var(--text-main);
   min-height: 100vh;
-  min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  overflow-x: clip;
   transition: var(--transition-theme);
 }
 
@@ -63,14 +59,13 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
 }
 
 /* ==========================================================================
-3. BARRA DE NAVEGAÇÃO DESKTOP
+   3. BARRA DE NAVEGAÇÃO DESKTOP
    ========================================================================== */
 .navbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  padding: 0.8rem clamp(0.75rem, 3vw, 2rem);
+  padding: 0.8rem 2rem;
   background-color: var(--card-bg);
   border-bottom: 1px solid var(--border-color);
   position: sticky;
@@ -84,7 +79,6 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
   align-items: center;
   gap: 10px;
   cursor: pointer;
-  flex-shrink: 0;
 }
 
 .logo-icon {
@@ -97,11 +91,10 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
   align-items: center;
   justify-content: center;
   font-size: 1.2rem;
-  flex-shrink: 0;
 }
 
 .logo-text {
-  font-size: clamp(1.2rem, 2.2vw, 1.5rem);
+  font-size: 1.5rem;
   font-weight: 800;
   color: var(--primary-color);
   letter-spacing: -0.5px;
@@ -109,23 +102,21 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
 
 .nav-links {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 
 .nav-btn {
   background: none;
   border: none;
-  padding: 10px 14px;
+  padding: 10px 16px;
   border-radius: 20px;
   color: var(--text-main);
   font-weight: 600;
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 8px;
-  white-space: nowrap;
 }
 
 .nav-btn:hover,
@@ -147,8 +138,7 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
 .header-controls {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
+  gap: 12px;
 }
 
 .lang-wrapper {
@@ -156,7 +146,7 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
   align-items: center;
   gap: 6px;
   background: var(--bg-body);
-  padding: 6px 10px;
+  padding: 6px 12px;
   border-radius: 20px;
   border: 1px solid var(--border-color);
 }
@@ -166,7 +156,6 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
   background: transparent;
   color: var(--text-main);
   font-weight: 600;
-  font-size: 0.85rem;
   cursor: pointer;
   outline: none;
 }
@@ -174,8 +163,8 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
 .icon-btn {
   background: var(--bg-body);
   border: 1px solid var(--border-color);
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   color: var(--text-main);
   cursor: pointer;
@@ -183,7 +172,6 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
   align-items: center;
   justify-content: center;
   font-size: 1rem;
-  flex-shrink: 0;
 }
 
 /* --- BOTÃO DE SAÍDA RÁPIDA --- */
@@ -200,7 +188,6 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
   align-items: center;
   gap: 6px;
   box-shadow: 0 2px 5px rgba(220, 38, 38, 0.3);
-  white-space: nowrap;
 }
 
 .quick-exit-btn:hover {
@@ -213,13 +200,13 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
 }
 
 /* ==========================================================================
-4. CONTAINER PRINCIPAL E SEÇÕES
+   4. CONTAINER PRINCIPAL E SEÇÕES
    ========================================================================== */
 .main-container {
-  max-width: 760px;
+  max-width: 680px;
   width: 100%;
-  margin: clamp(1rem, 3vw, 2rem) auto;
-  padding: 0 clamp(0.85rem, 3vw, 1.25rem);
+  margin: 2rem auto;
+  padding: 0 1rem;
   flex: 1;
 }
 
@@ -240,7 +227,7 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
 .section-header-back {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 15px;
   margin-bottom: 0.5rem;
 }
 
@@ -255,7 +242,6 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
 }
 
 .sub-header {
@@ -265,12 +251,12 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
 }
 
 /* ==========================================================================
-5. CARDS E GRIDS (TELA INICIAL)
+   5. CARDS E GRIDS (TELA INICIAL)
    ========================================================================== */
 .hero-card {
   background-color: var(--card-bg);
   border-radius: var(--radius-lg);
-  padding: clamp(1.5rem, 4vw, 2.5rem) clamp(1rem, 4vw, 2rem);
+  padding: 2.5rem 2rem;
   text-align: center;
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border-color);
@@ -289,7 +275,7 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
 
 .pink-title {
   color: var(--primary-color);
-  font-size: clamp(1.4rem, 3.5vw, 1.8rem);
+  font-size: 1.8rem;
   font-weight: 700;
   margin-bottom: 0.5rem;
 }
@@ -297,9 +283,9 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
 .hero-desc {
   color: var(--text-muted);
   font-size: 0.95rem;
-  max-width: 460px;
+  max-width: 440px;
   margin: 0 auto 1.5rem;
-  line-height: 1.45;
+  line-height: 1.4;
 }
 
 .btn-primary-large {
@@ -307,9 +293,9 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
   background-color: var(--primary-color);
   color: #ffffff;
   border: none;
-  padding: 15px 20px;
+  padding: 16px 20px;
   border-radius: 30px;
-  font-size: clamp(0.95rem, 2.2vw, 1.05rem);
+  font-size: 1.05rem;
   font-weight: 700;
   cursor: pointer;
   display: flex;
@@ -330,7 +316,7 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
 
 .grid-cards {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 12px;
   margin-bottom: 1.5rem;
 }
@@ -345,7 +331,6 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
   cursor: pointer;
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-sm);
-  min-width: 0;
 }
 
 .grid-card:hover {
@@ -368,7 +353,6 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
 
 .card-info {
   flex: 1;
-  min-width: 0;
 }
 
 .card-info h4 {
@@ -384,7 +368,6 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
 .arrow {
   color: var(--text-muted);
   font-size: 0.8rem;
-  flex-shrink: 0;
 }
 
 .security-footer-banner {
@@ -401,11 +384,10 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
 
 .security-footer-banner i {
   font-size: 1.3rem;
-  flex-shrink: 0;
 }
 
 /* ==========================================================================
-6. LISTAS E EMERGÊNCIA
+   6. LISTAS E EMERGÊNCIA
    ========================================================================== */
 .list-options {
   display: flex;
@@ -423,7 +405,6 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
   gap: 14px;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
-  min-width: 0;
 }
 
 .option-card:hover {
@@ -450,7 +431,6 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
 
 .opt-content {
   flex: 1;
-  min-width: 0;
 }
 
 .opt-content h4 {
@@ -466,7 +446,7 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
 .emergency-box {
   background: var(--card-bg);
   border-radius: var(--radius-lg);
-  padding: clamp(1.25rem, 4vw, 2rem);
+  padding: 2rem;
   text-align: center;
   border: 1px solid var(--border-color);
   margin-bottom: 1.5rem;
@@ -520,7 +500,6 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
 .btn-call div {
   flex: 1;
   text-align: left;
-  min-width: 0;
 }
 
 .btn-call strong {
@@ -530,7 +509,7 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
 
 .btn-call span {
   font-size: 0.8rem;
-  opacity: 0.92;
+  opacity: 0.9;
 }
 
 .other-options-section h4 {
@@ -544,7 +523,7 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
 }
 
 /* ==========================================================================
-7. FORMULÁRIOS E DENÚNCIA
+   7. FORMULÁRIOS E DENÚNCIA
    ========================================================================== */
 .report-top-banner {
   text-align: center;
@@ -595,7 +574,6 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
 
 .flex-1 {
   flex: 1;
-  min-width: 0;
 }
 
 .input-icon-wrapper {
@@ -612,12 +590,12 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
 
 .custom-input {
   width: 100%;
-  padding: 11px 12px 11px 38px;
+  padding: 10px 10px 10px 38px;
   border: 1px solid var(--border-color);
   background-color: var(--card-bg);
   color: var(--text-main);
   border-radius: 8px;
-  font-size: 0.95rem;
+  font-size: 14px;
   outline: none;
 }
 
@@ -640,7 +618,6 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
   align-items: flex-start;
   gap: 10px;
   cursor: pointer;
-  min-width: 0;
 }
 
 .radio-card.active {
@@ -677,7 +654,6 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
   border: 1px solid var(--border-color);
   background-color: var(--card-bg);
   color: var(--text-main);
-  font-size: 0.95rem;
   outline: none;
 }
 
@@ -687,15 +663,13 @@ a, button, input, select, textarea, .grid-card, .option-card, .radio-card {
 
 textarea {
   width: 100%;
-  padding: 12px 12px 28px 12px;
+  padding: 12px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
   background-color: var(--card-bg);
   color: var(--text-main);
-  font-size: 0.95rem;
   outline: none;
   resize: vertical;
-  min-height: 110px;
 }
 
 .char-counter {
@@ -741,9 +715,8 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
   background-color: var(--bg-body);
-  padding: 8px 10px;
+  padding: 6px 10px;
   border-radius: 6px;
   margin-top: 4px;
 }
@@ -753,8 +726,7 @@ textarea {
   border: none;
   color: var(--danger);
   cursor: pointer;
-  font-size: 1.1rem;
-  flex-shrink: 0;
+  font-size: 1rem;
 }
 
 .important-notice {
@@ -769,7 +741,7 @@ textarea {
 }
 
 /* ==========================================================================
-8. MAPA E LOCAIS
+   8. MAPA E LOCAIS
    ========================================================================== */
 .search-box {
   display: flex;
@@ -787,13 +759,11 @@ textarea {
   background: transparent;
   outline: none;
   color: var(--text-main);
-  font-size: 0.95rem;
   width: 100%;
-  min-width: 0;
 }
 
 #map-container {
-  height: clamp(220px, 36vh, 340px);
+  height: 280px;
   width: 100%;
   border-radius: var(--radius-lg);
   margin-bottom: 1.5rem;
@@ -805,7 +775,6 @@ textarea {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
   margin-bottom: 0.8rem;
 }
 
@@ -813,7 +782,6 @@ textarea {
   color: var(--primary-color);
   font-size: 0.85rem;
   text-decoration: none;
-  white-space: nowrap;
 }
 
 .places-list {
@@ -830,18 +798,12 @@ textarea {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  min-width: 0;
 }
 
 .place-icon {
   color: var(--primary-color);
   font-size: 1.2rem;
   margin-top: 2px;
-  flex-shrink: 0;
-}
-
-.place-details {
-  min-width: 0;
 }
 
 .place-details h4 {
@@ -873,25 +835,22 @@ textarea {
   align-items: center;
   gap: 12px;
   margin-top: 1.5rem;
-  flex-wrap: wrap;
 }
 
 .not-found-card i {
   font-size: 1.4rem;
   color: var(--primary-color);
-  flex-shrink: 0;
 }
 
 .not-found-card div {
   flex: 1;
-  min-width: 180px;
 }
 
 .btn-outline {
   background: transparent;
   border: 1px solid var(--primary-color);
   color: var(--primary-color);
-  padding: 7px 14px;
+  padding: 6px 12px;
   border-radius: 16px;
   font-weight: 600;
   cursor: pointer;
@@ -899,14 +858,14 @@ textarea {
 }
 
 /* ==========================================================================
-9. MODAIS E CHAT
+   9. MODAIS E CHAT
    ========================================================================== */
 .modal-overlay {
   display: none;
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background-color: rgba(0, 0, 0, 0.55);
-  z-index: 1100;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
   align-items: center;
   justify-content: center;
   padding: 1rem;
@@ -921,9 +880,9 @@ textarea {
   border-radius: var(--radius-lg);
   max-width: 500px;
   width: 100%;
-  padding: clamp(1rem, 3vw, 1.5rem);
+  padding: 1.5rem;
   box-shadow: var(--shadow-md);
-  max-height: 90dvh;
+  max-height: 90vh;
   overflow-y: auto;
 }
 
@@ -931,7 +890,6 @@ textarea {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
   border-bottom: 1px solid var(--border-color);
   padding-bottom: 0.8rem;
   margin-bottom: 1rem;
@@ -943,13 +901,12 @@ textarea {
   font-size: 1.5rem;
   color: var(--text-muted);
   cursor: pointer;
-  line-height: 1;
 }
 
 .chat-modal-box {
   display: flex;
   flex-direction: column;
-  height: min(480px, 78dvh);
+  height: 480px;
 }
 
 .online-status {
@@ -963,7 +920,6 @@ textarea {
   height: 10px;
   background-color: var(--success);
   border-radius: 50%;
-  flex-shrink: 0;
 }
 
 .chat-messages {
@@ -976,12 +932,11 @@ textarea {
 }
 
 .msg {
-  max-width: 85%;
+  max-width: 80%;
   padding: 10px 14px;
   border-radius: 14px;
   font-size: 0.9rem;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
+  line-height: 1.3;
 }
 
 .system-msg {
@@ -1005,8 +960,7 @@ textarea {
 
 .chat-input-area input {
   flex: 1;
-  min-width: 0;
-  padding: 10px 12px;
+  padding: 10px;
   border-radius: 20px;
   border: 1px solid var(--border-color);
   background-color: var(--bg-body);
@@ -1022,47 +976,10 @@ textarea {
   height: 38px;
   border-radius: 50%;
   cursor: pointer;
-  flex-shrink: 0;
-}
-
-/* ABAS DE AUTENTICAÇÃO NO MODAL */
-.auth-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--border-color);
-  margin-bottom: 16px;
-  background-color: var(--bg-body);
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
-  overflow: hidden;
-}
-
-.auth-tab-btn {
-  flex: 1;
-  padding: 12px 8px;
-  border: none;
-  background: transparent;
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: all 0.2s ease;
-}
-
-.auth-tab-btn.active {
-  color: var(--primary-color);
-  border-bottom: 3px solid var(--primary-color);
-  background-color: var(--card-bg);
-}
-
-.auth-tab-btn:hover {
-  background-color: var(--primary-light);
 }
 
 /* ==========================================================================
-10. NAVEGAÇÃO MOBILE
+   10. NAVEGAÇÃO MOBILE
    ========================================================================== */
 .mobile-nav {
   display: none;
@@ -1070,7 +987,7 @@ textarea {
   bottom: 0; left: 0; right: 0;
   background-color: var(--card-bg);
   border-top: 1px solid var(--border-color);
-  padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+  padding: 8px 0;
   justify-content: space-around;
   z-index: 1000;
 }
@@ -1083,10 +1000,8 @@ textarea {
   align-items: center;
   gap: 4px;
   color: var(--text-muted);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   cursor: pointer;
-  min-width: 0;
-  flex: 1;
 }
 
 .mob-btn.active {
@@ -1094,12 +1009,12 @@ textarea {
 }
 
 /* ==========================================================================
-11. RODAPÉ DO SITE
+   11. RODAPÉ DO SITE
    ========================================================================== */
 .site-footer {
   background-color: var(--card-bg);
   border-top: 1px solid var(--border-color);
-  padding: 40px 20px 24px 20px;
+  padding: 40px 20px 20px 20px;
   margin-top: 40px;
   color: var(--text-main);
 }
@@ -1192,9 +1107,9 @@ textarea {
 }
 
 /* ==========================================================================
-12. RESPONSIVIDADE (MEDIA QUERIES)
+   12. RESPONSIVIDADE (MEDIA QUERIES)
    ========================================================================== */
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .nav-links {
     display: none;
   }
@@ -1203,18 +1118,8 @@ textarea {
   }
   .main-container {
     margin: 1rem auto;
-    padding-bottom: 84px;
+    padding-bottom: 70px;
   }
-  .footer-container {
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
-  }
-  .site-footer {
-    padding-bottom: 92px;
-  }
-}
-
-@media (max-width: 768px) {
   .grid-cards {
     grid-template-columns: 1fr;
   }
@@ -1224,6 +1129,9 @@ textarea {
   .footer-container {
     grid-template-columns: 1fr;
     gap: 24px;
+  }
+  .site-footer {
+    padding-bottom: 80px;
   }
   .footer-bottom {
     flex-direction: column;
@@ -1238,24 +1146,41 @@ textarea {
   .quick-exit-btn {
     padding: 8px 10px;
   }
-  .lang-wrapper {
-    padding: 5px 8px;
-  }
   .form-row {
     flex-direction: column;
     gap: 0;
   }
 }
 
-@media (max-width: 380px) {
-  .logo-text {
-    display: none;
-  }
-  .header-controls {
-    gap: 6px;
-  }
-  .icon-btn {
-    width: 34px;
-    height: 34px;
-  }
+/* ABAS DE AUTENTICAÇÃO NO MODAL */
+.auth-tabs {
+  display: flex;
+  border-bottom: 1px solid #e0e0e0;
+  margin-bottom: 16px;
+  background-color: #f9f9f9;
+}
+
+.auth-tab-btn {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  background: transparent;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.auth-tab-btn.active {
+  color: #0288d1;
+  border-bottom: 3px solid #0288d1;
+  background-color: #ffffff;
+}
+
+.auth-tab-btn:hover {
+  background-color: #f0f0f0;
 }

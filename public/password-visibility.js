@@ -1,6 +1,3 @@
-const API_BASE_URL = 'https://acolhe-mvp.onrender.com';
-fetch(`${API_BASE_URL}/api/denuncias`, { credentials: 'include' })
-
 // Controle de visibilidade para campos de senha do index.html.
 function togglePasswordVisibility(inputId, button) {
   const input = document.getElementById(inputId);
