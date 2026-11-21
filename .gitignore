@@ -1,7 +1,23 @@
-﻿node_modules/
-playwright-report/
-test-results/
+﻿# Dependências e ambiente
+node_modules/
+.env
+
+# Banco de dados e arquivos locais
 data/
 evidencias/
-.env
 *.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# Relatórios de testes (Playwright)
+playwright-report/
+test-results/
+
+# Builds e caches locais do Android / Capacitor
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.apk
+*.aab
