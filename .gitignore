@@ -1,8 +1,9 @@
-﻿# Dependências e ambiente
+# Dependências e ambiente
 node_modules/
 .env
 
 # Banco de dados e arquivos locais
+android/
 data/
 evidencias/
 *.sqlite
