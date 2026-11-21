@@ -33,6 +33,12 @@ CREATE TABLE IF NOT EXISTS reports(id INTEGER PRIMARY KEY, user_id INTEGER REFER
 CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, actor_id INTEGER, report_id INTEGER, action TEXT NOT NULL, details TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
 CREATE INDEX IF NOT EXISTS idx_reports_created ON reports(created_at); CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at);`);
 
+const ALLOWED_ORIGINS = new Set([
+  'https://localhost',
+  'http://localhost',
+  'capacitor://localhost',
+  'https://acolhe-mvp.onrender.com'
+]);
 
 const q = (sql) => db.prepare(sql);
 const passwordHash = async (p) => { const salt=crypto.randomBytes(16).toString('hex'); return `${salt}:${(await scrypt(p,salt,64)).toString('hex')}`; };
@@ -43,9 +49,29 @@ function cookie(req, name='sid') { return (req.headers.cookie||'').split(';').ma
 function sessionFor(req,name='sid') { const sid=cookie(req,name); if(!sid)return null; const s=q('SELECT user_id FROM sessions WHERE sid_hash=? AND expires_at>?').get(hashSid(sid),Date.now()); return s?q('SELECT id,email,name,phone,is_admin FROM users WHERE id=?').get(s.user_id):null; }
 function userFor(req) { const u=sessionFor(req,'sid'); return u&&!u.is_admin?u:null; }
 function adminFor(req) { const u=sessionFor(req,'admin_sid'); return u&&u.is_admin?u:null; }
+function applyCors(req, res) {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+}
 function send(res, code, data, headers={}) { res.writeHead(code, {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',...headers}); res.end(JSON.stringify(data)); }
-function setSession(res,id,name='sid') { const raw=crypto.randomBytes(32).toString('base64url'); q('INSERT INTO sessions(sid_hash,user_id,expires_at) VALUES(?,?,?)').run(hashSid(raw),id,Date.now()+8*60*60*1000); res.setHeader('Set-Cookie',`${name}=${raw}; Path=/; HttpOnly; SameSite=Strict; Max-Age=28800${IS_PROD?'; Secure':''}`); }
-function clearSession(req,res,name='sid') { const sid=cookie(req,name); if(sid)q('DELETE FROM sessions WHERE sid_hash=?').run(hashSid(sid)); res.setHeader('Set-Cookie',`${name}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${IS_PROD?'; Secure':''}`); }
+function setSession(res,id,name='sid') {
+  const raw=crypto.randomBytes(32).toString('base64url');
+  q('INSERT INTO sessions(sid_hash,user_id,expires_at) VALUES(?,?,?)').run(hashSid(raw),id,Date.now()+8*60*60*1000);
+  const sameSite = IS_PROD ? 'SameSite=None; Secure' : 'SameSite=Lax';
+  res.setHeader('Set-Cookie',`${name}=${raw}; Path=/; HttpOnly; ${sameSite}; Max-Age=28800`);
+}
+function clearSession(req,res,name='sid') {
+  const sid=cookie(req,name);
+  if(sid)q('DELETE FROM sessions WHERE sid_hash=?').run(hashSid(sid));
+  const sameSite = IS_PROD ? 'SameSite=None; Secure' : 'SameSite=Lax';
+  res.setHeader('Set-Cookie',`${name}=; Path=/; HttpOnly; ${sameSite}; Max-Age=0`);
+}
 function audit(actor, reportId, action, details={}) { q('INSERT INTO audit(actor_id,report_id,action,details) VALUES(?,?,?,?)').run(actor?.id||null,reportId||null,action,JSON.stringify(details)); }
 function admin(req,res) { const u=adminFor(req); if(!u){send(res,401,{erro:'Autenticação administrativa necessária.'});return null;} return u; }
 function rateLimit(req,res,max=10) { const ip=String(req.socket.remoteAddress||'unknown'); const now=Date.now(); for(const [k,v] of limits) if(v.until<now) limits.delete(k); const x=limits.get(ip)||{n:0,until:now+60000}; x.n++; limits.set(ip,x); if(x.n>max){send(res,429,{erro:'Muitas requisições. Tente novamente mais tarde.'});return false;} return true; }
@@ -58,7 +84,12 @@ async function body(req) {
   try{return JSON.parse(Buffer.concat(chunks).toString('utf8')||'{}');}
   catch{throw Object.assign(Error('JSON inválido.'),{status:400});}
 }
-function checkOrigin(req) { const origin=req.headers.origin; if(!origin)return true; try{return new URL(origin).host===req.headers.host;}catch{return false;} }
+function checkOrigin(req) {
+  const origin=req.headers.origin;
+  if(!origin)return true;
+  if(ALLOWED_ORIGINS.has(origin))return true;
+  try{return new URL(origin).host===req.headers.host;}catch{return false;}
+}
 const allowedViolence=new Set(['fisica','psicologica','patrimonial','sexual','moral','cibernetica','institucional']);
 const MIME_TO_EXT = new Map([
   ['image/jpeg', 'jpg'],
@@ -123,9 +154,9 @@ function triage(text, type) {
 
   // Vocabulário de Alto Risco (Crimes graves, ameaça de morte, agressão severa, ciberataque grave)
   const highRiskKeywords = [
-    'arma', 'sangue', 'ameaca', 'espanc', 'socos', 'pontapes', 'faca', 
+    'arma', 'sangue', 'ameaca', 'espanc', 'socos', 'pontapes', 'faca',
     'perigo', 'trancada', 'trancado', 'fakes', 'fotos', 'videos',
-    'vazou', 'expor', 'extorsao', 'estupro', 'forcada', 'matar', 'machucar', 
+    'vazou', 'expor', 'extorsao', 'estupro', 'forcada', 'matar', 'machucar',
     'assedio', 'agrediu', 'lesoes', 'espancou', 'estrangul', 'morrer'
   ];
 
@@ -133,18 +164,18 @@ function triage(text, type) {
   const medRiskKeywords = [
     'humilh', 'empurrou', 'controlador', 'ofensa', 'xingou', 'xingamento',
     'perseguindo', 'seguindo', 'dinheiro', 'documento', 'escondeu', 'reter',
-    'recusou', 'debochou', 'negligencia', 'omissao', 'boatos', 'mentiras', 
+    'recusou', 'debochou', 'negligencia', 'omissao', 'boatos', 'mentiras',
     'honra', 'ameaca', 'chantagem', 'isolamento', 'depreciou', 'insinuacoes',
     'reputacao', 'trabalho', 'pertences', 'destruiu', 'cancelou', 'guardas', 'filhos'
   ];
 
   // Identificação estrita de dúvida, consulta informativa ou pedido de orientação
-  const isQueryOnly = 
-    t.includes('duvida') || 
-    t.includes('orientac') || 
-    t.includes('geral') || 
-    t.includes('informac') || 
-    t.includes('canais') || 
+  const isQueryOnly =
+    t.includes('duvida') ||
+    t.includes('orientac') ||
+    t.includes('geral') ||
+    t.includes('informac') ||
+    t.includes('canais') ||
     t.includes('legislac') ||
     t.includes('atendimento');
 
@@ -162,7 +193,7 @@ function triage(text, type) {
   // ==========================================
   // GARANTIAS ABSOLUTAS POR TIPOLOGIA
   // ==========================================
-  
+
   // 1. Tipologias Críticas (Física, Sexual, Cibernética): Sempre Alta Urgência (85pts)
   if (['fisica', 'sexual', 'cibernetica'].includes(tipologia)) {
     pontos = Math.max(pontos, 85);
@@ -203,51 +234,60 @@ function serve(req,res,pathname){let decoded;try{decoded=decodeURIComponent(path
 const cspHeader=CSP_ENFORCE?'Content-Security-Policy':'Content-Security-Policy-Report-Only';
 res.writeHead(200,{'Content-Type':mime(file),'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Cache-Control':'no-store',[cspHeader]:csp});if(req.method==='HEAD')return res.end();fs.createReadStream(file).pipe(res);});}
 
-async function route(req,res){const u=new URL(req.url,'http://localhost');const p=u.pathname,m=req.method;const actor=userFor(req);
- if(p.startsWith('/api/')&&!checkOrigin(req)&&['POST','PATCH','DELETE'].includes(m))return send(res,403,{erro:'Origem da requisição não autorizada.'});
- if(p==='/api/health'&&m==='GET')return send(res,200,{ok:true});
- if(p==='/api/me'&&m==='GET')return send(res,200,{user:actor?{id:actor.id,email:actor.email,name:actor.name,phone:actor.phone}:null});
- if(p==='/api/register'&&m==='POST'){if(!rateLimit(req,res,5))return;const b=await body(req),email=String(b.email||'').trim().toLowerCase(),password=b.password;if(!/^\S+@\S+\.\S+$/.test(email)||email.length>200||typeof password!=='string'||password.length<10||password.length>128)return send(res,400,{erro:'Informe e-mail válido e senha entre 10 e 128 caracteres.'});if(q('SELECT id FROM users WHERE email=?').get(email))return send(res,409,{erro:'E-mail já cadastrado.'});const hash=await passwordHash(password);const r=q('INSERT INTO users(email,name,phone,password_hash) VALUES(?,?,?,?)').run(email,String(b.name||'').slice(0,200),String(b.phone||'').slice(0,40),hash);setSession(res,Number(r.lastInsertRowid));return send(res,201,{mensagem:'Conta criada.'});}
- if((p==='/api/login'||p==='/api/admin/login')&&m==='POST'){if(!rateLimit(req,res,5))return;const b=await body(req),email=String(b.email||'').trim().toLowerCase(),user=q('SELECT * FROM users WHERE email=?').get(email);if(!user||!(await passwordOk(String(b.password||''),user.password_hash))||(p==='/api/admin/login'&&!user.is_admin))return send(res,401,{erro:'Credenciais inválidas.'});setSession(res,user.id,p==='/api/admin/login'?'admin_sid':'sid');if(user.is_admin)audit({id:user.id},null,'login_admin');return send(res,200,{mensagem:'Login realizado.',user:{id:user.id,email:user.email,name:user.name,is_admin:!!user.is_admin}});}
- if((p==='/api/logout'||p==='/api/admin/logout')&&m==='POST'){const adminActor=adminFor(req);if(adminActor)audit(adminActor,null,'logout_admin');const isAdminLogout=p==='/api/admin/logout';clearSession(req,res,isAdminLogout?'admin_sid':'sid');return send(res,200,{mensagem:'Sessão encerrada.'});}
- if(p==='/api/admin/me'&&m==='GET'){const a=adminFor(req);return send(res,a?200:401,{authenticated:!!a,user:a});}
- if(p==='/api/minhas-denuncias'&&m==='GET'){if(!actor)return send(res,401,{erro:'Faça login.'});return send(res,200,q("SELECT id,report_type AS tipo_denuncia,violence_type AS tipo_violencia,status,triage AS ai_analise,strftime('%Y-%m-%dT%H:%M:%SZ', created_at) AS criado_em FROM reports WHERE user_id=? ORDER BY id DESC").all(actor.id));}
- 
- if(p==='/api/denuncias'&&m==='POST'){
-   if(!rateLimit(req,res,10))return;
-   const b=await body(req),type=b.tipo_denuncia,v=String(b.tipo_violencia||''),desc=String(b.descricao||'').trim();
-   if(type==='identified'&&!actor)return send(res,401,{erro:'Faça login com uma conta de usuária para enviar uma denúncia identificada.'});
-   if(!['anon','identified'].includes(type)||!allowedViolence.has(v)||!desc||desc.length>1000)return send(res,400,{erro:'Dados da denúncia inválidos.'});
-   if(type==='identified'&&(!actor||actor.is_admin||!String(actor.name||'').trim()||!String(actor.phone||'').trim()))return send(res,400,{erro:'Complete nome e telefone no cadastro antes de enviar denúncia identificada.'});
-   
-   const files=Array.isArray(b.arquivos)?b.arquivos:[];
-   if(files.length>MAX_FILES||files.some(f=>!Number.isSafeInteger(f?.size)||f.size<1||f.size>MAX_FILE_SIZE)||files.reduce((n,f)=>n+f.size,0)>MAX_TOTAL_FILE_SIZE)return send(res,400,{erro:'Anexos excedem os limites permitidos.'});
-   
-   const tri=triage(desc,v),name=type==='identified'?(actor.name||String(b.nome||'').slice(0,200)):null,phone=type==='identified'?(actor.phone||String(b.telefone||'').slice(0,40)):null,email=type==='identified'?actor.email:null;
-   const r=q('INSERT INTO reports(user_id,report_type,violence_type,description,name,phone,email,triage) VALUES(?,?,?,?,?,?,?,?)').run(type==='identified'?actor.id:null,type,v,desc,name,phone,email,JSON.stringify(tri));
-   const id=Number(r.lastInsertRowid);
-   try{
-     const stored=await saveFiles(files,id);
-     q('UPDATE reports SET files=? WHERE id=?').run(JSON.stringify(stored),id);
-     const report=q("SELECT strftime('%Y-%m-%dT%H:%M:%SZ', created_at) AS criado_em FROM reports WHERE id=?").get(id);
-     return send(res,201,{id,status:'Recebida',criado_em:report.criado_em,ai:tri,arquivos:stored.map(f=>f.name)});
-   }catch(e){
-     q('DELETE FROM reports WHERE id=?').run(id);
-     return send(res,e.status||400,{erro:e.message});
-   }
- }
+async function route(req,res){
+  const u=new URL(req.url,'http://localhost');
+  const p=u.pathname,m=req.method;
+  if(p.startsWith('/api/')) applyCors(req,res);
+  if(p.startsWith('/api/')&&m==='OPTIONS'){
+    if(!checkOrigin(req))return send(res,403,{erro:'Origem da requisição não autorizada.'});
+    res.writeHead(204);
+    return res.end();
+  }
+  const actor=userFor(req);
+  if(p.startsWith('/api/')&&!checkOrigin(req)&&['POST','PATCH','DELETE'].includes(m))return send(res,403,{erro:'Origem da requisição não autorizada.'});
+  if(p==='/api/health'&&m==='GET')return send(res,200,{ok:true});
+  if(p==='/api/me'&&m==='GET')return send(res,200,{user:actor?{id:actor.id,email:actor.email,name:actor.name,phone:actor.phone}:null});
+  if(p==='/api/register'&&m==='POST'){if(!rateLimit(req,res,5))return;const b=await body(req),email=String(b.email||'').trim().toLowerCase(),password=b.password;if(!/^\S+@\S+\.\S+$/.test(email)||email.length>200||typeof password!=='string'||password.length<10||password.length>128)return send(res,400,{erro:'Informe e-mail válido e senha entre 10 e 128 caracteres.'});if(q('SELECT id FROM users WHERE email=?').get(email))return send(res,409,{erro:'E-mail já cadastrado.'});const hash=await passwordHash(password);const r=q('INSERT INTO users(email,name,phone,password_hash) VALUES(?,?,?,?)').run(email,String(b.name||'').slice(0,200),String(b.phone||'').slice(0,40),hash);setSession(res,Number(r.lastInsertRowid));return send(res,201,{mensagem:'Conta criada.'});}
+  if((p==='/api/login'||p==='/api/admin/login')&&m==='POST'){if(!rateLimit(req,res,5))return;const b=await body(req),email=String(b.email||'').trim().toLowerCase(),user=q('SELECT * FROM users WHERE email=?').get(email);if(!user||!(await passwordOk(String(b.password||''),user.password_hash))||(p==='/api/admin/login'&&!user.is_admin))return send(res,401,{erro:'Credenciais inválidas.'});setSession(res,user.id,p==='/api/admin/login'?'admin_sid':'sid');if(user.is_admin)audit({id:user.id},null,'login_admin');return send(res,200,{mensagem:'Login realizado.',user:{id:user.id,email:user.email,name:user.name,is_admin:!!user.is_admin}});}
+  if((p==='/api/logout'||p==='/api/admin/logout')&&m==='POST'){const adminActor=adminFor(req);if(adminActor)audit(adminActor,null,'logout_admin');const isAdminLogout=p==='/api/admin/logout';clearSession(req,res,isAdminLogout?'admin_sid':'sid');return send(res,200,{mensagem:'Sessão encerrada.'});}
+  if(p==='/api/admin/me'&&m==='GET'){const a=adminFor(req);return send(res,a?200:401,{authenticated:!!a,user:a});}
+  if(p==='/api/minhas-denuncias'&&m==='GET'){if(!actor)return send(res,401,{erro:'Faça login.'});return send(res,200,q("SELECT id,report_type AS tipo_denuncia,violence_type AS tipo_violencia,status,triage AS ai_analise,strftime('%Y-%m-%dT%H:%M:%SZ', created_at) AS criado_em FROM reports WHERE user_id=? ORDER BY id DESC").all(actor.id));}
 
- if(p.startsWith('/api/admin/')){
-   const a=admin(req,res);if(!a)return;
-   if(p==='/api/admin/denuncias'&&m==='GET'){const where=[],args=[];const status=u.searchParams.get('status'),search=u.searchParams.get('q');if(['Recebida','Em análise','Concluída'].includes(status)){where.push('status=?');args.push(status);}if(search){where.push('(CAST(id AS TEXT) LIKE ? OR description LIKE ? OR email LIKE ?)');const s=`%${search.slice(0,100)}%`;args.push(s,s,s);}const sql=`SELECT id,report_type AS tipo_denuncia,violence_type AS tipo_violencia,description AS descricao,status,name AS nome,phone AS telefone,email,files AS arquivos,triage AS ai_analise,strftime('%Y-%m-%dT%H:%M:%SZ', created_at) AS criado_em FROM reports ${where.length?'WHERE '+where.join(' AND '):''} ORDER BY id DESC LIMIT 500`;audit(a,null,'listar_denuncias',{busca:search||null});return send(res,200,q(sql).all(...args));}
-   if(p==='/api/admin/denuncias/limpar'&&m==='DELETE'){const reports=q('SELECT id,files FROM reports').all();const tx=db;tx.exec('BEGIN');try{q('DELETE FROM audit').run();q('DELETE FROM reports').run();audit(a,null,'limpar_base_dados',{quantidade:reports.length});tx.exec('COMMIT');for(const r of reports){try{for(const f of JSON.parse(r.files||'[]'))await fsp.unlink(path.join(UPLOADS,path.basename(f.file))).catch(()=>{});}catch{}}return send(res,200,{mensagem:'Base de dados limpa.'});}catch(e){tx.exec('ROLLBACK');throw e;}}
-   if(p==='/api/admin/auditoria/limpar'&&m==='DELETE'){db.exec('BEGIN');try{q('DELETE FROM audit').run();audit(a,null,'limpar_logs_auditoria',{operador:a.email});db.exec('COMMIT');return send(res,200,{mensagem:'Logs anteriores removidos; esta ação foi registada.'});}catch(e){db.exec('ROLLBACK');throw e;}}
-   if(p==='/api/admin/auditoria'&&m==='GET'){audit(a,null,'consultar_auditoria');return send(res,200,q('SELECT a.id,a.action AS acao,a.details AS detalhes,a.created_at AS criado_em,u.email AS operador FROM audit a LEFT JOIN users u ON u.id=a.actor_id ORDER BY a.id DESC LIMIT 500').all());}
-   if(p==='/api/admin/export/csv'&&m==='GET'){const rows=q("SELECT id,strftime('%Y-%m-%dT%H:%M:%SZ', created_at) AS created_at,report_type,violence_type,description,status,name,phone,email,triage FROM reports ORDER BY id DESC").all();const headers=['id','created_at','report_type','violence_type','description','status','name','phone','email','triage'];const text=[headers,...rows.map(r=>headers.map(h=>r[h]))].map(row=>row.map(csvCell).join(',')).join('\r\n');audit(a,null,'exportar_csv',{registros:rows.length});res.writeHead(200,{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="denuncias.csv"','Cache-Control':'no-store'});return res.end('\ufeff'+text);}
-   const match=p.match(/^\/api\/admin\/denuncias\/(\d+)$/);if(match){const id=Number(match[1]),row=q('SELECT * FROM reports WHERE id=?').get(id);if(!row)return send(res,404,{erro:'Denúncia não encontrada.'});if(m==='PATCH'){const b=await body(req);if(!['Recebida','Em análise','Concluída'].includes(b.status))return send(res,400,{erro:'Status inválido.'});q('UPDATE reports SET status=? WHERE id=?').run(b.status,id);audit(a,id,'alterar_status',{de:row.status,para:b.status});return send(res,200,{id,status:b.status});}if(m==='DELETE'){q('DELETE FROM reports WHERE id=?').run(id);audit(a,id,'excluir_denuncia',{});try{for(const f of JSON.parse(row.files||'[]'))await fsp.unlink(path.join(UPLOADS,path.basename(f.file))).catch(()=>{});}catch{}return send(res,200,{mensagem:'Denúncia excluída.',id});}}
-   if(p==='/api/admin/analytics'&&m==='GET'){const statuses=q('SELECT status AS chave,COUNT(*) AS valor FROM reports GROUP BY status').all(),violence=q('SELECT violence_type AS chave,COUNT(*) AS valor FROM reports GROUP BY violence_type').all();return send(res,200,{distribuicoes:{status:statuses,violencia:violence}});}
- }
- if(p.startsWith('/api/'))return send(res,404,{erro:'Rota da API não encontrada.'});if(!['GET','HEAD'].includes(m))return send(res,405,{erro:'Método não permitido.'});return serve(req,res,p);
+  if(p==='/api/denuncias'&&m==='POST'){
+    if(!rateLimit(req,res,10))return;
+    const b=await body(req),type=b.tipo_denuncia,v=String(b.tipo_violencia||''),desc=String(b.descricao||'').trim();
+    if(type==='identified'&&!actor)return send(res,401,{erro:'Faça login com uma conta de usuária para enviar uma denúncia identificada.'});
+    if(!['anon','identified'].includes(type)||!allowedViolence.has(v)||!desc||desc.length>1000)return send(res,400,{erro:'Dados da denúncia inválidos.'});
+    if(type==='identified'&&(!actor||actor.is_admin||!String(actor.name||'').trim()||!String(actor.phone||'').trim()))return send(res,400,{erro:'Complete nome e telefone no cadastro antes de enviar denúncia identificada.'});
+
+    const files=Array.isArray(b.arquivos)?b.arquivos:[];
+    if(files.length>MAX_FILES||files.some(f=>!Number.isSafeInteger(f?.size)||f.size<1||f.size>MAX_FILE_SIZE)||files.reduce((n,f)=>n+f.size,0)>MAX_TOTAL_FILE_SIZE)return send(res,400,{erro:'Anexos excedem os limites permitidos.'});
+
+    const tri=triage(desc,v),name=type==='identified'?(actor.name||String(b.nome||'').slice(0,200)):null,phone=type==='identified'?(actor.phone||String(b.telefone||'').slice(0,40)):null,email=type==='identified'?actor.email:null;
+    const r=q('INSERT INTO reports(user_id,report_type,violence_type,description,name,phone,email,triage) VALUES(?,?,?,?,?,?,?,?)').run(type==='identified'?actor.id:null,type,v,desc,name,phone,email,JSON.stringify(tri));
+    const id=Number(r.lastInsertRowid);
+    try{
+      const stored=await saveFiles(files,id);
+      q('UPDATE reports SET files=? WHERE id=?').run(JSON.stringify(stored),id);
+      const report=q("SELECT strftime('%Y-%m-%dT%H:%M:%SZ', created_at) AS criado_em FROM reports WHERE id=?").get(id);
+      return send(res,201,{id,status:'Recebida',criado_em:report.criado_em,ai:tri,arquivos:stored.map(f=>f.name)});
+    }catch(e){
+      q('DELETE FROM reports WHERE id=?').run(id);
+      return send(res,e.status||400,{erro:e.message});
+    }
+  }
+
+  if(p.startsWith('/api/admin/')){
+    const a=admin(req,res);if(!a)return;
+    if(p==='/api/admin/denuncias'&&m==='GET'){const where=[],args=[];const status=u.searchParams.get('status'),search=u.searchParams.get('q');if(['Recebida','Em análise','Concluída'].includes(status)){where.push('status=?');args.push(status);}if(search){where.push('(CAST(id AS TEXT) LIKE ? OR description LIKE ? OR email LIKE ?)');const s=`%${search.slice(0,100)}%`;args.push(s,s,s);}const sql=`SELECT id,report_type AS tipo_denuncia,violence_type AS tipo_violencia,description AS descricao,status,name AS nome,phone AS telefone,email,files AS arquivos,triage AS ai_analise,strftime('%Y-%m-%dT%H:%M:%SZ', created_at) AS criado_em FROM reports ${where.length?'WHERE '+where.join(' AND '):''} ORDER BY id DESC LIMIT 500`;audit(a,null,'listar_denuncias',{busca:search||null});return send(res,200,q(sql).all(...args));}
+    if(p==='/api/admin/denuncias/limpar'&&m==='DELETE'){const reports=q('SELECT id,files FROM reports').all();const tx=db;tx.exec('BEGIN');try{q('DELETE FROM audit').run();q('DELETE FROM reports').run();audit(a,null,'limpar_base_dados',{quantidade:reports.length});tx.exec('COMMIT');for(const r of reports){try{for(const f of JSON.parse(r.files||'[]'))await fsp.unlink(path.join(UPLOADS,path.basename(f.file))).catch(()=>{});}catch{}}return send(res,200,{mensagem:'Base de dados limpa.'});}catch(e){tx.exec('ROLLBACK');throw e;}}
+    if(p==='/api/admin/auditoria/limpar'&&m==='DELETE'){db.exec('BEGIN');try{q('DELETE FROM audit').run();audit(a,null,'limpar_logs_auditoria',{operador:a.email});db.exec('COMMIT');return send(res,200,{mensagem:'Logs anteriores removidos; esta ação foi registada.'});}catch(e){db.exec('ROLLBACK');throw e;}}
+    if(p==='/api/admin/auditoria'&&m==='GET'){audit(a,null,'consultar_auditoria');return send(res,200,q('SELECT a.id,a.action AS acao,a.details AS detalhes,a.created_at AS criado_em,u.email AS operador FROM audit a LEFT JOIN users u ON u.id=a.actor_id ORDER BY a.id DESC LIMIT 500').all());}
+    if(p==='/api/admin/export/csv'&&m==='GET'){const rows=q("SELECT id,strftime('%Y-%m-%dT%H:%M:%SZ', created_at) AS created_at,report_type,violence_type,description,status,name,phone,email,triage FROM reports ORDER BY id DESC").all();const headers=['id','created_at','report_type','violence_type','description','status','name','phone','email','triage'];const text=[headers,...rows.map(r=>headers.map(h=>r[h]))].map(row=>row.map(csvCell).join(',')).join('\r\n');audit(a,null,'exportar_csv',{registros:rows.length});res.writeHead(200,{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="denuncias.csv"','Cache-Control':'no-store'});return res.end('\ufeff'+text);}
+    const match=p.match(/^\/api\/admin\/denuncias\/(\d+)$/);if(match){const id=Number(match[1]),row=q('SELECT * FROM reports WHERE id=?').get(id);if(!row)return send(res,404,{erro:'Denúncia não encontrada.'});if(m==='PATCH'){const b=await body(req);if(!['Recebida','Em análise','Concluída'].includes(b.status))return send(res,400,{erro:'Status inválido.'});q('UPDATE reports SET status=? WHERE id=?').run(b.status,id);audit(a,id,'alterar_status',{de:row.status,para:b.status});return send(res,200,{id,status:b.status});}if(m==='DELETE'){q('DELETE FROM reports WHERE id=?').run(id);audit(a,id,'excluir_denuncia',{});try{for(const f of JSON.parse(row.files||'[]'))await fsp.unlink(path.join(UPLOADS,path.basename(f.file))).catch(()=>{});}catch{}return send(res,200,{mensagem:'Denúncia excluída.',id});}}
+    if(p==='/api/admin/analytics'&&m==='GET'){const statuses=q('SELECT status AS chave,COUNT(*) AS valor FROM reports GROUP BY status').all(),violence=q('SELECT violence_type AS chave,COUNT(*) AS valor FROM reports GROUP BY violence_type').all();return send(res,200,{distribuicoes:{status:statuses,violencia:violence}});}
+  }
+  if(p.startsWith('/api/'))return send(res,404,{erro:'Rota da API não encontrada.'});if(!['GET','HEAD'].includes(m))return send(res,405,{erro:'Método não permitido.'});return serve(req,res,p);
 }
 
 const server=http.createServer((req,res)=>{route(req,res).catch(err=>{console.error(err);if(!res.headersSent)send(res,err.status||500,{erro:err.status?err.message:'Erro interno no servidor.'});else res.destroy();});});
