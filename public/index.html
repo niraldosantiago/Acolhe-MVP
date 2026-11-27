@@ -79,7 +79,59 @@
         <span data-i18n="quick_exit">SAÍDA RÁPIDA</span>
       </button>
     </div>
+
+    <!-- BOTÃO MENU HAMBÚRGUER (VISÍVEL AO DIMINUIR A TELA) -->
+    <button
+      id="hamburger-btn"
+      class="hamburger-btn"
+      type="button"
+      aria-label="Abrir menu de navegação"
+      aria-controls="hamburger-drawer"
+      aria-expanded="false"
+      onclick="toggleHamburgerMenu()"
+    >
+      <i class="fa-solid fa-bars" aria-hidden="true"></i>
+    </button>
   </header>
+
+  <!-- MENU GAVETA HAMBÚRGUER -->
+  <div id="hamburger-backdrop" class="hamburger-backdrop" onclick="closeHamburgerMenu()"></div>
+  <aside id="hamburger-drawer" class="hamburger-drawer" aria-label="Menu principal" aria-hidden="true">
+    <div>
+      <div class="hamburger-drawer-header">
+        <div class="logo" onclick="closeHamburgerMenu(); navigateTo('home')">
+          <div class="logo-icon"><i class="fa-solid fa-heart-pulse"></i></div>
+          <span class="logo-text">acolhe</span>
+        </div>
+        <button class="close-modal" type="button" aria-label="Fechar menu" onclick="closeHamburgerMenu()">&times;</button>
+      </div>
+
+      <nav class="hamburger-nav-list">
+        <button class="nav-btn active" data-target="home" onclick="closeHamburgerMenu(); navigateTo('home')">
+          <i class="fa-solid fa-house"></i> <span data-i18n="nav_home">Início</span>
+        </button>
+        <button class="nav-btn" data-target="help" onclick="closeHamburgerMenu(); navigateTo('help')">
+          <i class="fa-solid fa-hand-holding-heart"></i> <span data-i18n="nav_help">Como Ajudar</span>
+        </button>
+        <button class="nav-btn emergency-nav-link" data-target="emergency" onclick="closeHamburgerMenu(); navigateTo('emergency')">
+          <i class="fa-solid fa-triangle-exclamation"></i> <span data-i18n="nav_emergency">Emergência</span>
+        </button>
+        <button class="nav-btn" data-target="report" onclick="closeHamburgerMenu(); navigateTo('report')">
+          <i class="fa-solid fa-shield-cat"></i> <span data-i18n="nav_report">Fazer Denúncia</span>
+        </button>
+        <button class="nav-btn" data-target="map" onclick="closeHamburgerMenu(); navigateTo('map')">
+          <i class="fa-solid fa-location-dot"></i> <span data-i18n="nav_map">Onde Buscar</span>
+        </button>
+        <button class="nav-btn" data-target="profile" onclick="closeHamburgerMenu(); navigateTo('profile')">
+          <i class="fa-solid fa-user-shield"></i> <span>Minha Conta</span>
+        </button>
+      </nav>
+    </div>
+
+    <div class="hamburger-drawer-footer">
+      <div id="hamburger-controls-slot" class="hamburger-controls-slot"></div>
+    </div>
+  </aside>
 
   <!-- CONTAINER PRINCIPAL -->
   <main class="main-container">

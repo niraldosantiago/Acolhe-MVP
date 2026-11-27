@@ -42,6 +42,75 @@ async function parseJsonOrThrow(response) {
   return parsed ?? {};
 }
 
+// --- MENU HAMBÚRGUER RESPONSIVO ---
+function isHamburgerMenuOpen() {
+  return Boolean(document.getElementById('hamburger-drawer')?.classList.contains('open'));
+}
+
+function openHamburgerMenu() {
+  const drawer = document.getElementById('hamburger-drawer');
+  const backdrop = document.getElementById('hamburger-backdrop');
+  const btn = document.getElementById('hamburger-btn');
+
+  if (drawer) {
+    drawer.classList.add('open');
+    drawer.setAttribute('aria-hidden', 'false');
+  }
+  if (backdrop) backdrop.classList.add('active');
+  if (btn) btn.setAttribute('aria-expanded', 'true');
+  document.body.classList.add('hamburger-open');
+}
+
+function closeHamburgerMenu() {
+  const drawer = document.getElementById('hamburger-drawer');
+  const backdrop = document.getElementById('hamburger-backdrop');
+  const btn = document.getElementById('hamburger-btn');
+
+  if (drawer) {
+    drawer.classList.remove('open');
+    drawer.setAttribute('aria-hidden', 'true');
+  }
+  if (backdrop) backdrop.classList.remove('active');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+  document.body.classList.remove('hamburger-open');
+}
+
+function toggleHamburgerMenu() {
+  if (isHamburgerMenuOpen()) {
+    closeHamburgerMenu();
+  } else {
+    openHamburgerMenu();
+  }
+}
+
+function syncHamburgerControlsSlot() {
+  const navbar = document.querySelector('.navbar');
+  const headerControls = navbar?.querySelector('.header-controls') || document.querySelector('#hamburger-controls-slot .header-controls');
+  const hamburgerBtn = document.getElementById('hamburger-btn');
+  const slot = document.getElementById('hamburger-controls-slot');
+  if (!navbar || !headerControls || !slot) return;
+
+  const width = window.innerWidth || document.documentElement.clientWidth || 390;
+  const isSmallScreen = width <= 640;
+
+  if (isSmallScreen) {
+    if (headerControls.parentElement !== slot) {
+      slot.appendChild(headerControls);
+    }
+  } else {
+    if (headerControls.parentElement !== navbar) {
+      if (hamburgerBtn && hamburgerBtn.parentElement === navbar) {
+        navbar.insertBefore(headerControls, hamburgerBtn);
+      } else {
+        navbar.appendChild(headerControls);
+      }
+    }
+    if (width > 960 && isHamburgerMenuOpen()) {
+      closeHamburgerMenu();
+    }
+  }
+}
+
 // --- ADAPTAÇÃO RESPONSIVA SEM ALTERAR ESTRUTURA, ÍCONES OU ESTILOS BASE ---
 function syncResponsiveViewport() {
   const width = window.innerWidth || document.documentElement.clientWidth || 390;
@@ -59,6 +128,8 @@ function syncResponsiveViewport() {
   document.body.classList.toggle('is-tablet-view', width > 768 && width <= 1024);
   document.body.classList.toggle('is-desktop-view', width > 1024);
   document.body.classList.toggle('is-native-app', Boolean(isCapacitorNative));
+
+  syncHamburgerControlsSlot();
 
   const mapContainer = document.getElementById('map-container');
   if (mapContainer) {
@@ -102,7 +173,7 @@ const i18nTranslations = {
     nav_map: "Onde Buscar",
     quick_exit: "SAÍDA RÁPIDA",
     hero_subtitle: "Você não está sozinha.",
-    hero_desc: "Encontre orientação, información e canais de apoio de forma rápida e segura.",
+    hero_desc: "Encontre orientação, informações e canais de apoio de forma rápida e segura.",
     btn_need_help: "PRECISO DE AJUDA AGORA",
     how_can_we_help: "Como podemos ajudar?",
     card_find_help_title: "Encontrar ajuda",
@@ -348,6 +419,7 @@ function switchAuthTab(tab) {
 
 // --- NAVEGAÇÃO ENTRE SEÇÕES (SPA) ---
 function navigateTo(targetId) {
+  closeHamburgerMenu();
   document.querySelectorAll('.page-section').forEach(sec => sec.classList.remove('active'));
   document.querySelectorAll('.nav-btn, .mob-btn').forEach(btn => btn.classList.remove('active'));
 
@@ -369,8 +441,6 @@ function navigateTo(targetId) {
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
-
-// Os botões de navegação são tratados pelos handlers do HTML para evitar disparo duplo.
 
 // --- SISTEMA DE TRADUÇÃO ---
 const langSelector = document.getElementById('lang-selector');
@@ -730,6 +800,7 @@ function showAllLocations(e) {
 
 // --- MODAIS E CHAT ---
 function openModal(modalId) {
+  closeHamburgerMenu();
   const modal = document.getElementById(modalId);
   if (modal) {
     modal.classList.add('active');
@@ -783,6 +854,10 @@ function quickExit() {
 
 document.addEventListener("keydown", function (event) {
   if (event.key === "Escape") {
+    if (isHamburgerMenuOpen()) {
+      closeHamburgerMenu();
+      return;
+    }
     quickExit();
   }
 });
